@@ -1,0 +1,25 @@
+.bs{position:absolute;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;visibility:visible!important;cursor:pointer;transition:opacity .55s ease}
+.bs.out{opacity:0;pointer-events:none}
+.bs-img{width:100%;max-height:100%;object-fit:contain;display:block}
+.bs-t{display:flex;align-items:center;gap:6px;max-width:94%}
+.bs-w{font-family:"Yuanti SC","YouYuan","HYChangYuanTi","Microsoft YaHei","PingFang SC",sans-serif;font-weight:900;font-size:58px;letter-spacing:6px;white-space:nowrap;text-shadow:3px 3px 0 #fff,-1px -1px 0 #fff,3px -1px 0 #fff,-1px 3px 0 #fff;-webkit-text-stroke:1px currentColor}
+.bs-d{display:inline-flex}
+.bs-d .bs-star{filter:drop-shadow(2px 2px 0 currentColor)}
+.bs-d.l{transform:rotate(-14deg)}.bs-d.r{transform:rotate(14deg)}
+.bs-s{margin-top:12px;font-size:13px;letter-spacing:3px;opacity:.8}
+.bs-fade .bs-t,.bs-fade .bs-img,.bs-fade .bs-s{animation:bsFade .9s ease both}
+.bs-rise .bs-t,.bs-rise .bs-img,.bs-rise .bs-s{animation:bsRise .9s cubic-bezier(.2,.9,.3,1) both}
+.bs-pop .bs-t,.bs-pop .bs-img,.bs-pop .bs-s{animation:bsPop .7s cubic-bezier(.3,1.6,.5,1) both}
+@keyframes bsFade{from{opacity:0}to{opacity:1}}
+@keyframes bsRise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+@keyframes bsPop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+.bs-lab{font-size:12px;color:var(--text-sub);margin:10px 2px 4px}
+.bs-chips{display:flex;gap:8px;margin-bottom:6px}
+.bs-chips button{flex:1;border:1px solid var(--border-color);background:var(--card-bg);color:var(--theme-dark);border-radius:999px;padding:8px 0;font-size:13px}
+.bs-chips button.on{background:var(--theme-color);color:var(--on-accent);border-color:transparent}
+.bs-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:6px 0;font-size:13px}
+.bs-row label{display:inline-flex;gap:6px;align-items:center}
+.bs-row input[type=color]{width:34px;height:26px;border:1px solid var(--border-color);border-radius:6px;padding:0;background:none}
+.bs-row .btn-secondary{width:auto;padding:0 16px}
+@media (prefers-reduced-motion:reduce){.bs *{animation-duration:.01s!important}}
+.bs-img.big{width:150%;max-width:none}
