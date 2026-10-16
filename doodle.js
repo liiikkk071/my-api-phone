@@ -59,7 +59,7 @@
 
     function mask(html) {
         const m = document.createElement('div'); m.className = 'dd-mask'; m.innerHTML = '<div class="dd-sheet">' + html + '</div>';
-        m.addEventListener('mousedown', (e) => { if (e.target === m) m.remove(); }); document.body.appendChild(m); return m;
+        m.addEventListener('mousedown', (e) => { if (e.target === m) m.remove(); }); (document.querySelector('.phone') || document.body).appendChild(m); return m;
     }
     function fileToPng(file, max) {
         return new Promise((res, rej) => {
@@ -109,7 +109,7 @@
     function choose(opts) {
         opts = opts || {};
         return new Promise((resolve) => {
-            let color = opts.color || '#555555', tab = 'built';
+            let color = opts.color || '#ff8fab', tab = 'built';
             const m = mask('<h3 class="dd-h">选一个小装饰</h3><div class="dd-tabs"><button data-t="built" class="on">内置手绘</button><button data-t="mine">我的</button></div><div id="ddGrid" class="dd-grid"></div><div class="dd-row" id="ddColRow"><span>内置装饰颜色</span><input type="color" id="ddPick" value="' + color + '"></div>'
                 + '<div class="dd-btns"><button id="ddDraw">＋ 自己手绘</button><button id="ddImp">＋ 导入图片</button><button id="ddX">关闭</button></div><input type="file" id="ddFile" accept="image/*" hidden>');
             const grid = m.querySelector('#ddGrid');

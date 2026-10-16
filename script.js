@@ -1268,7 +1268,7 @@ on('memClearBtn', 'click', () => {
         const cur = String(store.getItem('liveCustom') || '').trim() || LIVE_RULES_DEFAULT.trim();
         const m = document.createElement('div'); m.className = 'ui-dlg-mask'; m.style.zIndex = 950;
         m.innerHTML = '<div class="ui-dlg" style="width:min(92vw,420px)"><div class="ui-dlg-msg" style="text-align:left">活人感指令：每次聊天都会发给 TA，告诉 TA 怎样像真人一样说话。可以改成你想要的风格；清空后保存＝恢复默认。</div><textarea id="liveTa" style="width:100%;height:46vh;box-sizing:border-box;border:1px solid var(--border,#ddd);border-radius:10px;padding:10px;font-size:13px;line-height:1.5;background:transparent;color:inherit"></textarea><div class="ui-dlg-btns"><button id="liveCancel">取消</button><button id="liveDef">恢复默认</button><button class="ok" id="liveOk">保存</button></div></div>';
-        document.body.appendChild(m); const ta = m.querySelector('#liveTa'); ta.value = cur;
+        (document.querySelector('.phone') || document.body).appendChild(m); const ta = m.querySelector('#liveTa'); ta.value = cur;
         m.querySelector('#liveCancel').onclick = () => m.remove();
         m.querySelector('#liveDef').onclick = () => { try { store.setItem('liveCustom', ''); } catch (e) {} m.remove(); uiAlert('已恢复默认'); };
         m.querySelector('#liveOk').onclick = () => { const v = ta.value.trim(); try { store.setItem('liveCustom', (!v || v === LIVE_RULES_DEFAULT.trim()) ? '' : v); } catch (e) {} m.remove(); uiAlert('已保存'); };

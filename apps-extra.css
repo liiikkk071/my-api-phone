@@ -125,7 +125,7 @@
 .ic-nav .add{flex:none;width:54px;height:54px;border-radius:50%;background:var(--theme-color);color:#fff;margin:-22px 10px 0;box-shadow:0 6px 14px rgba(0,0,0,.2);justify-content:center}
 .ic-nav .add svg{stroke:#fff;width:26px;height:26px;stroke-width:2.2}
 .ic-add{position:absolute;inset:0;background:var(--bg-color);z-index:70;display:flex;flex-direction:column;animation:xaUp .2s ease}
-.ic-add .hd{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;flex:none}
+.ic-add .hd{display:flex;align-items:center;justify-content:space-between;padding:48px 14px 12px;flex:none}
 .ic-add .hd button{border:none;background:transparent;color:var(--theme-dark);font-size:15px;cursor:pointer;padding:4px 6px}
 .ic-add .tp{display:flex;background:var(--card-bg);border:1px solid var(--border-color);border-radius:999px;padding:3px}
 .ic-add .tp button{padding:6px 18px;border-radius:999px;color:var(--text-sub);font-size:14px}
@@ -389,3 +389,76 @@
 #chatRoomApp .input-area{position:relative}
 #replyNowBtn{position:absolute;right:14px;top:-40px;z-index:6;border-radius:999px;padding:0 14px;height:32px;background:var(--card-bg);color:var(--theme-dark,var(--theme-color));border:1px solid var(--theme-color);font-size:13px;cursor:pointer;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.12)}
 #replyNowBtn.hidden{display:none}
+
+/* ---- 手绘小装饰 / 气泡装饰（弹层放在手机屏幕里面，跟随主题） ---- */
+.dd-mask{position:absolute;inset:0;z-index:890;background:rgba(20,16,24,.5);display:flex;align-items:flex-end;justify-content:center;animation:xaIn .18s ease}
+.dd-sheet{width:100%;max-height:88%;overflow-y:auto;overflow-x:hidden;background:var(--bg-color,var(--card-bg));color:var(--text-main);border-radius:22px 22px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom,0px));animation:xaUp .22s ease;box-sizing:border-box;-webkit-overflow-scrolling:touch}
+.dd-sheet *{box-sizing:border-box}
+.dd-sheet button{font-family:inherit}
+.dd-h{margin:0 0 12px;font-size:17px;text-align:center;color:var(--text-main)}
+.dd-tabs{display:flex;gap:8px;margin-bottom:12px}
+.dd-tabs button,.dd-chips button,.dd-chip{border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-main);border-radius:999px;padding:7px 14px;font-size:13px;cursor:pointer;line-height:1.2}
+.dd-tabs button{flex:1}
+.dd-tabs button.on,.dd-chips button.on,.dd-chip.on{background:var(--theme-color);color:var(--on-accent);border-color:transparent}
+.dd-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px;max-height:36vh;overflow-y:auto;padding:2px}
+.dd-it{position:relative;aspect-ratio:1/1;width:100%;border:1px solid var(--border-color);border-radius:12px;background:var(--card-bg);padding:7px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.dd-it img{max-width:100%;max-height:100%;display:block}
+.dd-it i{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#e0556b;color:#fff;font-style:normal;font-size:13px;line-height:18px;text-align:center}
+.dd-empty{grid-column:1/-1;font-size:12px;color:var(--text-sub);line-height:1.6;margin:6px 0}
+.dd-row{display:flex;align-items:center;gap:10px;margin:10px 0;font-size:14px;color:var(--text-main);flex-wrap:wrap}
+.dd-row>span{flex:none}
+.dd-row input[type=range]{flex:1;min-width:90px}
+.dd-row input[type=color],.dd-cols input[type=color]{width:34px;height:30px;border:1px solid var(--border-color);border-radius:8px;padding:0;background:none}
+.dd-btns{display:flex;gap:8px;margin-top:14px}
+.dd-btns button{flex:1;border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-main);border-radius:999px;padding:11px 0;font-size:14px;cursor:pointer}
+.dd-btns button.pri{background:var(--theme-color);color:var(--on-accent);border-color:transparent}
+.dd-cv{background:repeating-conic-gradient(#e9e9e9 0 25%,#fff 0 50%) 0 0/16px 16px;border:1px solid var(--border-color);border-radius:14px;overflow:hidden;width:min(100%,300px);aspect-ratio:1/1;margin:0 auto}
+.dd-cv canvas{width:100%;height:100%;display:block}
+.dd-cols{display:flex;gap:8px;align-items:center;justify-content:center;margin:12px 0;flex-wrap:wrap}
+.dd-cols i{width:24px;height:24px;border-radius:50%;border:2px solid var(--border-color);cursor:pointer}
+.dd-cols i.on{outline:2px solid var(--theme-color);outline-offset:2px}
+.dd-tip{font-size:12px;color:var(--text-sub);text-align:center;margin:4px 0}
+.dd-prev{background:rgba(128,128,128,.12);border-radius:14px;padding:16px 20px;margin-bottom:12px;display:flex;flex-direction:column;gap:18px;overflow:hidden}
+.dd-prev .message{display:flex;margin:0}.dd-prev .user-message{justify-content:flex-end}
+.dd-lab{font-size:13px;color:var(--text-sub);margin:14px 0 8px;font-weight:600}
+.dd-chips{display:flex;gap:8px;flex-wrap:wrap}
+.dd-slot{display:flex;align-items:center;gap:10px;margin:8px 0;flex-wrap:wrap}
+.dd-thumb{width:56px;height:56px;flex:none;border:1.5px dashed var(--border-color);border-radius:14px;background:var(--card-bg);font-size:22px;color:var(--text-sub);cursor:pointer;padding:4px}
+.dd-thumb img{width:100%;height:100%;object-fit:contain}
+.dd-sl{display:flex;flex-direction:column;gap:6px;flex:1;min-width:130px;font-size:12px;color:var(--text-sub)}
+.dd-sl label{display:flex;gap:6px;align-items:center}.dd-sl input{flex:1;min-width:0}
+.dd-sl select,.dd-row select{border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-main);border-radius:8px;padding:5px 8px;font-size:13px}
+.dd-x{border:none;background:transparent;color:#e0556b;font-size:12px;cursor:pointer}
+
+/* 照片堆叠：自己的装饰层 + 背景形状 */
+.hw-stack .sk-stk{position:absolute;inset:0;z-index:40;pointer-events:none}
+.hw-stack .sk-stk img{position:absolute;height:auto;display:block}
+.ps-prev .sk-stk img{pointer-events:auto;cursor:grab;touch-action:none}
+.ps-add{width:58px;height:58px;border:1.5px dashed var(--border-color);border-radius:12px;background:transparent;font-size:22px;color:var(--text-sub);cursor:pointer}
+.ps-shapes{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:4px 0 6px}
+.ps-shapes button{aspect-ratio:1/1;border:1px solid var(--border-color);border-radius:12px;background:var(--card-bg);padding:6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--text-sub)}
+.ps-shapes button i{display:block;width:70%;aspect-ratio:1/1;background:var(--text-sub);opacity:.75}
+.ps-shapes button.on{border-color:var(--theme-color);outline:2px solid var(--theme-color);outline-offset:-1px;color:var(--text-main)}
+.ps-shapes button.on i{background:var(--theme-color);opacity:1}
+.hw-stack .sk-bg.shaped{border-radius:0!important;border:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.hw-stack .sk-bgwrap{position:absolute;inset:0;pointer-events:none}
+
+/* iCost 一起管理 */
+.ic-sh{background:var(--card-bg);border:1px solid var(--border-color);border-radius:16px;padding:12px;margin:10px 0}
+.ic-sh-hd{display:flex;gap:10px;align-items:center}
+.ic-sh-hd .avatar-small{width:36px;height:36px;flex:none}
+.ic-sh-hd b{display:block;font-size:14px;color:var(--text-main)}
+.ic-sh-hd small{color:var(--text-sub);font-size:12px}
+.ic-aa{margin-top:10px;font-size:13px;color:var(--text-main);display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--accent-soft,rgba(128,128,128,.1));border-radius:10px;padding:8px 10px}
+.ic-aa b{color:var(--theme-dark,var(--theme-color))}
+.ic-aa button,.ic-goal-btns button,.ic-sh-btns button{border:1px solid var(--theme-color);background:transparent;color:var(--theme-dark,var(--theme-color));border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer}
+.ic-aa button{margin-left:auto}
+.ic-goal{margin-top:10px}
+.ic-goal>div:first-child{display:flex;justify-content:space-between;font-size:13px;color:var(--text-main)}
+.ic-goal span{color:var(--text-sub)}
+.ic-goal .bar{height:8px;border-radius:999px;background:var(--accent-soft,rgba(128,128,128,.15));margin:6px 0;overflow:hidden}
+.ic-goal .bar i{display:block;height:100%;background:var(--theme-color);border-radius:inherit}
+.ic-goal-btns,.ic-sh-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.ic-by{font-style:normal;font-size:10px;background:var(--theme-color);color:var(--on-accent);border-radius:6px;padding:1px 5px;vertical-align:1px}
+.ic-by.ta{background:#8a7be0;color:#fff}.ic-by.aa{background:#f6c344;color:#5a4300}
+.ic-cm{display:block;font-size:11px;color:var(--theme-dark,var(--text-sub));margin-top:2px}
