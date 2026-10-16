@@ -13,7 +13,7 @@
     };
     function D() {
         let d = null; try { d = JSON.parse(store.getItem(KEY) || 'null'); } catch (e) { }
-        if (!d || !Array.isArray(d.items)) d = { lists: [{ id: 'l_def', name: '提醒', color: COLORS[0] }, { id: 'l_life', name: '生活', color: COLORS[4] }, { id: 'l_work', name: '工作 / 学习', color: COLORS[1] }], items: [] };
+        if (!d || !Array.isArray(d.items)) d = { lists: [{ id: 'l_def', name: '日常', color: COLORS[0] }, { id: 'l_life', name: '生活', color: COLORS[4] }, { id: 'l_work', name: '工作 / 学习', color: COLORS[1] }], items: [] };
         return d;
     }
     function S(d) { try { store.setItem(KEY, JSON.stringify(d)); } catch (e) { uiAlert('保存失败，空间不够了'); } }
@@ -50,16 +50,20 @@
         GLYPH.agenda = '<rect x="4.5" y="5" width="15" height="15" rx="3.5"/><path d="M8 3.5v3M16 3.5v3M8.5 13l2.3 2.3 4.7-4.8"/>';
     } catch (e) { }
 
-    let view = { t: 'home' }, calY, calM, calSel;
+    // 结构：底部 4 个固定页签 —— 今天（要做的）/ 日历（按日期看）/ 全部（按列表分组，管理列表）/ 已完成。
+    // 每条提醒都明确属于一个列表；添加时一定能看到「放入哪个列表」。
+    const TABS = [['today', '今天', 'today'], ['cal', '日历', 'plan'], ['all', '全部', 'all'], ['done', '已完成', 'done']];
+    let view = { t: 'today', list: '' }, calY, calM, calSel, lastList = '';
     function ensure() {
         if ($('agendaApp')) return;
         const el = document.createElement('div'); el.id = 'agendaApp'; el.className = 'app-screen hidden'; el.style.position = 'absolute';
-        el.innerHTML = '<div class="app-header"><button id="agBack">‹ 返回</button><span id="agTitle">日程提醒</span><button class="hdr-btn" id="agSet">设置</button></div><div class="scroll-area xa-body" id="agBody"></div><button class="xa-fab" id="agFab">＋</button>';
+        el.innerHTML = '<div class="app-header"><button id="agBack">‹ 返回</button><span id="agTitle">日程提醒</span><button class="hdr-btn" id="agSet">设置</button></div><div class="scroll-area xa-body ag-body" id="agBody"></div><button class="xa-fab ag-fab" id="agFab">＋</button><div class="ag-tabs" id="agTabs"></div>';
         ($('callScreen') ? $('callScreen').parentElement : document.body).appendChild(el);
-        $('agBack').onclick = () => { if (view.t === 'home') goHome(); else { view = { t: 'home' }; render(); } };
+        $('agBack').onclick = () => goHome();
         $('agFab').onclick = () => editSheet(null);
         $('agSet').onclick = settings;
-        new MutationObserver(() => { if (!el.classList.contains('hidden')) { view = { t: 'home' }; render(); } }).observe(el, { attributes: true, attributeFilter: ['class'] });
+        $('agTabs').onclick = (e) => { const b = e.target.closest('[data-tab]'); if (!b) return; view.t = b.dataset.tab; if (view.t === 'cal' && !calY) { const n = new Date(); calY = n.getFullYear(); calM = n.getMonth(); calSel = T(); } render(); $('agBody').scrollTop = 0; };
+        new MutationObserver(() => { if (!el.classList.contains('hidden')) { view = { t: 'today', list: '' }; const n = new Date(); calY = n.getFullYear(); calM = n.getMonth(); calSel = T(); render(); } }).observe(el, { attributes: true, attributeFilter: ['class'] });
     }
     function sheet(html) {
         const app = $('agendaApp'), m = document.createElement('div'); m.className = 'xa-mask'; m.innerHTML = '<div class="xa-sheet">' + html + '</div>';
@@ -67,53 +71,65 @@
     }
     function render() {
         const d = D(), body = $('agBody'); if (!body) return;
-        $('agTitle').textContent = view.t === 'home' ? '日程提醒' : view.t === 'cal' ? '日历' : view.name || '提醒';
-        $('agBack').textContent = view.t === 'home' ? '‹ 返回' : '‹ 提醒';
-        if (view.t === 'home') return home(d, body);
+        const cnt = { today: smart(d, 'today').length, cal: 0, all: smart(d, 'all').length, done: 0 };
+        $('agTabs').innerHTML = TABS.map(t => '<button data-tab="' + t[0] + '" class="' + (view.t === t[0] ? 'on' : '') + '"><svg viewBox="0 0 24 24">' + ICO[t[2]] + '</svg><span>' + t[1] + '</span>' + (cnt[t[0]] ? '<i>' + (cnt[t[0]] > 99 ? '99+' : cnt[t[0]]) + '</i>' : '') + '</button>').join('');
+        $('agTitle').textContent = '日程提醒';
+        $('agFab').style.display = '';
         if (view.t === 'cal') return cal(d, body);
-        return listView(d, body);
+        if (view.t === 'all') return allView(d, body);
+        if (view.t === 'done') return doneView(d, body);
+        return todayView(d, body);
     }
-    function home(d, body) {
-        let h = '<div class="ag-smart">' + Object.keys(SM).map(k => '<div class="ag-card" data-s="' + k + '"><div class="top"><span class="ico" style="background:' + SM[k][1] + '"><svg viewBox="0 0 24 24">' + ICO[k] + '</svg></span><span class="n">' + smart(d, k).length + '</span></div><div class="t">' + SM[k][0] + '</div></div>').join('') + '</div>';
-        h += '<div class="ag-card" data-cal="1" style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><span class="ico" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#8a7be0"><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round"><rect x="4" y="5.5" width="16" height="14" rx="3"/><path d="M4 10h16M9 3.5v4M15 3.5v4"/></svg></span><b style="flex:1;font-size:15px;color:var(--text-main)">日历视图</b><span style="color:var(--text-sub)">›</span></div>';
-        h += '<div class="xa-title">我的列表</div><div class="ag-list">' + d.lists.map(l => '<div class="li-row" data-l="' + l.id + '"><span class="dot" style="background:' + l.color + '"></span><b>' + esc(l.name) + '</b><em>' + d.items.filter(i => i.list === l.id && !i.done).length + '</em><span style="color:var(--text-sub)">›</span></div>').join('') + '</div>';
-        h += '<div class="xa-btns"><button id="agAddList">＋ 添加列表</button></div>';
-        body.innerHTML = h;
-        body.querySelectorAll('[data-s]').forEach(e => e.onclick = () => { view = { t: 'smart', k: e.dataset.s, name: SM[e.dataset.s][0], color: SM[e.dataset.s][1] }; render(); });
-        body.querySelectorAll('[data-l]').forEach(e => e.onclick = () => { const l = listOf(d, e.dataset.l); view = { t: 'list', id: l.id, name: l.name, color: l.color }; render(); });
-        body.querySelector('[data-cal]').onclick = () => { const n = new Date(); calY = n.getFullYear(); calM = n.getMonth(); calSel = T(); view = { t: 'cal' }; render(); };
-        $('agAddList').onclick = () => listSheet(null);
+    // 添加条：输入 + 明确选「放入哪个列表」
+    function quickBar(d, defDate) {
+        const cur = d.lists.some(l => l.id === (view.list || lastList)) ? (view.list || lastList) : d.lists[0].id;
+        return '<div class="ag-quick"><input id="agQ" placeholder="写下一件事，回车添加" maxlength="60"><button id="agQb">添加</button></div><div class="ag-into">放入列表：<select id="agQl">' + d.lists.map(l => '<option value="' + l.id + '"' + (l.id === cur ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('') + '</select>' + (defDate ? '<span class="ag-tag">日期：' + dateLabel(defDate) + '</span>' : '<span class="ag-tag">不设日期</span>') + '</div>';
+    }
+    function bindQuick(defDate) {
+        const q = $('agQ'); if (!q) return;
+        const add = () => { const v = q.value.trim(); if (!v) return; const dd = D(), lid = $('agQl').value; lastList = lid; dd.items.push({ id: uid(), title: v, note: '', date: defDate || '', time: '', repeat: 'none', pri: 0, list: lid, done: false, ta: false }); S(dd); const nm = listOf(dd, lid).name; render(); uiAlert('已放入「' + nm + '」', 1200); };
+        q.onkeydown = (e) => { if (e.key === 'Enter') add(); }; $('agQb').onclick = add;
+    }
+    function todayView(d, body) {
+        const od = smart(d, 'today').filter(i => i.date < T()).sort(cmp), td = smart(d, 'today').filter(i => i.date === T()).sort(cmp);
+        const soon = d.items.filter(i => !i.done && i.date && i.date > T() && dayNum(i.date) - dayNum(T()) <= 7).sort(cmp), nod = d.items.filter(i => !i.done && !i.date).sort(cmp);
+        const total = od.length + td.length;
+        let h = '<div class="ag-sum"><div><b>' + total + '</b><span>今天要做</span></div><div class="' + (od.length ? 'od' : '') + '"><b>' + od.length + '</b><span>已过期</span></div><div><b>' + soon.length + '</b><span>7 天内</span></div><div><b>' + nod.length + '</b><span>没定日期</span></div></div>';
+        h += quickBar(d, T());
+        if (od.length) h += '<div class="ag-grp" style="color:#e0556b">已过期 · 先处理这些</div>' + od.map(i => itemRow(d, i)).join('');
+        h += '<div class="ag-grp">今天（' + td.length + '）</div>' + (td.length ? td.map(i => itemRow(d, i)).join('') : '<div class="xa-empty" style="padding:14px">' + (od.length ? '今天还没有新的安排' : '今天没有待办，轻松一下吧') + '</div>');
+        if (soon.length) h += '<div class="ag-grp">接下来 7 天</div>' + soon.slice(0, 8).map(i => itemRow(d, i)).join('') + (soon.length > 8 ? '<div class="ag-more" data-go="cal">还有 ' + (soon.length - 8) + ' 条，去日历查看 ›</div>' : '');
+        if (nod.length) h += '<div class="ag-grp">没定日期</div>' + nod.slice(0, 5).map(i => itemRow(d, i)).join('') + (nod.length > 5 ? '<div class="ag-more" data-go="all">还有 ' + (nod.length - 5) + ' 条，去「全部」查看 ›</div>' : '');
+        body.innerHTML = h; bindItems(body); bindQuick(T());
+        body.querySelectorAll('[data-go]').forEach(e => e.onclick = () => { view.t = e.dataset.go; if (view.t === 'cal' && !calY) { const n = new Date(); calY = n.getFullYear(); calM = n.getMonth(); calSel = T(); } render(); });
     }
     function itemRow(d, it, color) {
         const l = listOf(d, it.list), when = it.date ? dateLabel(it.date) + (it.time ? ' ' + it.time : '') : '', od = overdue(it);
-        return '<div class="ag-it' + (it.done ? ' done' : '') + '" style="--lc:' + (color || l.color) + '" data-id="' + it.id + '"><button class="ag-chk' + (it.done ? ' on' : '') + '" data-chk="' + it.id + '"></button><div class="mid" data-edit="' + it.id + '"><div class="tt">' + (it.pri ? '<b style="color:' + l.color + '">' + '!'.repeat(it.pri) + '</b> ' : '') + esc(it.title) + '</div>' + (it.note ? '<div class="sub">' + esc(it.note.slice(0, 40)) + '</div>' : '') + ((when || (it.repeat && it.repeat !== 'none') || it.ta) ? '<div class="sub' + (od ? ' od' : '') + '">' + [when, it.repeat && it.repeat !== 'none' ? REPEAT[it.repeat] : '', it.ta ? 'TA提醒' : ''].filter(Boolean).join(' · ') + '</div>' : '') + '</div></div>';
+        return '<div class="ag-it' + (it.done ? ' done' : '') + '" style="--lc:' + (color || l.color) + '" data-id="' + it.id + '"><button class="ag-chk' + (it.done ? ' on' : '') + '" data-chk="' + it.id + '"></button><div class="mid" data-edit="' + it.id + '"><div class="tt">' + (it.pri ? '<b style="color:' + l.color + '">' + '!'.repeat(it.pri) + '</b> ' : '') + esc(it.title) + '</div>' + (it.note ? '<div class="sub">' + esc(it.note.slice(0, 40)) + '</div>' : '') + '<div class="sub' + (od ? ' od' : '') + '"><span class="ag-ltag" style="background:' + l.color + '22;color:' + l.color + '">' + esc(l.name) + '</span>' + [when, it.repeat && it.repeat !== 'none' ? REPEAT[it.repeat] : '', it.ta ? 'TA提醒' : ''].filter(Boolean).map(x => ' · ' + x).join('') + '</div></div></div>';
     }
     function bindItems(body) {
         body.querySelectorAll('[data-chk]').forEach(b => b.onclick = (e) => { e.stopPropagation(); toggle(b.dataset.chk); });
         body.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => editSheet(b.dataset.edit));
     }
-    function listView(d, body) {
-        let items, h = '';
-        if (view.t === 'smart') items = smart(d, view.k); else items = d.items.filter(i => i.list === view.id);
-        const color = view.color || COLORS[0];
-        h += '<div class="ag-h" style="--lc:' + color + '"><h2>' + esc(view.name) + '</h2>' + (view.t === 'list' ? '<button class="hdr-btn" id="agEditL">编辑列表</button>' : (view.k === 'done' && items.length ? '<button class="hdr-btn" id="agClear">清空</button>' : '')) + '</div>';
-        if (!(view.t === 'smart' && view.k === 'done')) h += '<div class="ag-quick"><input id="agQ" placeholder="新提醒，回车添加" maxlength="60"><button id="agQb">添加</button></div>';
-        if (!items.length) h += '<div class="xa-empty">' + (view.k === 'done' ? '还没有完成的事项' : '这里空空的，加一条吧') + '</div>';
-        else if (view.t === 'smart' && view.k === 'plan') {
-            const by = {}; items.sort(cmp).forEach(i => (by[i.date] = by[i.date] || []).push(i)); Object.keys(by).sort().forEach(k => { h += '<div class="ag-grp">' + dateLabel(k) + '</div>' + by[k].map(i => itemRow(d, i)).join(''); });
-        } else if (view.t === 'smart' && view.k === 'today') {
-            const od = items.filter(i => i.date < T()).sort(cmp), td = items.filter(i => i.date === T()).sort(cmp);
-            if (od.length) h += '<div class="ag-grp" style="color:#e0556b">已过期</div>' + od.map(i => itemRow(d, i)).join(''); if (td.length) h += '<div class="ag-grp">今天</div>' + td.map(i => itemRow(d, i)).join('');
-        } else if (view.t === 'smart' && view.k === 'all') {
-            d.lists.forEach(l => { const a = items.filter(i => i.list === l.id).sort(cmp); if (a.length) h += '<div class="ag-grp" style="color:' + l.color + '">' + esc(l.name) + '</div>' + a.map(i => itemRow(d, i)).join(''); });
-        } else {
-            const open = items.filter(i => !i.done).sort(cmp), dn = items.filter(i => i.done);
-            h += open.map(i => itemRow(d, i, color)).join(''); if (dn.length) h += '<div class="ag-grp">已完成 ' + dn.length + '</div>' + dn.map(i => itemRow(d, i, color)).join('');
-            if (view.k === 'done') h = h.replace(/<div class="ag-grp">已完成 \d+<\/div>/, '');
-        }
-        body.innerHTML = h; bindItems(body);
-        const q = $('agQ'); if (q) { const add = () => { const v = q.value.trim(); if (!v) return; const dd = D(); dd.items.push({ id: uid(), title: v, note: '', date: view.t === 'smart' && view.k === 'today' ? T() : '', time: '', repeat: 'none', pri: 0, list: view.t === 'list' ? view.id : dd.lists[0].id, done: false, ta: false }); S(dd); render(); }; q.onkeydown = (e) => { if (e.key === 'Enter') add(); }; $('agQb').onclick = add; }
-        if ($('agEditL')) $('agEditL').onclick = () => listSheet(view.id);
+    function allView(d, body) {
+        const f = view.list && d.lists.some(l => l.id === view.list) ? view.list : '';
+        let h = '<div class="ag-chips"><button data-f="" class="' + (f ? '' : 'on') + '">全部 ' + d.items.filter(i => !i.done).length + '</button>' + d.lists.map(l => '<button data-f="' + l.id + '" class="' + (f === l.id ? 'on' : '') + '" style="--lc:' + l.color + '"><i style="background:' + l.color + '"></i>' + esc(l.name) + ' ' + d.items.filter(i => i.list === l.id && !i.done).length + '</button>').join('') + '<button data-newl="1" class="add">＋ 新列表</button></div>';
+        view.list = f; h += quickBar(d, '');
+        const lists = f ? d.lists.filter(l => l.id === f) : d.lists;
+        lists.forEach(l => {
+            const a = d.items.filter(i => i.list === l.id && !i.done).sort(cmp);
+            h += '<div class="ag-grp ag-lh" style="color:' + l.color + '"><span>' + esc(l.name) + '（' + a.length + '）</span><em data-el="' + l.id + '">编辑列表</em></div>' + (a.length ? a.map(i => itemRow(d, i)).join('') : '<div class="xa-empty" style="padding:12px">这个列表还没有事项</div>');
+        });
+        body.innerHTML = h; bindItems(body); bindQuick('');
+        body.querySelectorAll('[data-f]').forEach(e => e.onclick = () => { view.list = e.dataset.f; render(); });
+        body.querySelectorAll('[data-el]').forEach(e => e.onclick = () => listSheet(e.dataset.el));
+        body.querySelector('[data-newl]').onclick = () => listSheet(null);
+    }
+    function doneView(d, body) {
+        const items = d.items.filter(i => i.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+        let h = '<div class="ag-h"><h2>已完成</h2>' + (items.length ? '<button class="hdr-btn" id="agClear">清空</button>' : '') + '</div>';
+        h += items.length ? '<p class="ag-note">点左边的圆圈可以恢复成待办。</p>' + items.map(i => itemRow(d, i)).join('') : '<div class="xa-empty">还没有完成的事项</div>';
+        body.innerHTML = h; bindItems(body); $('agFab').style.display = 'none';
         if ($('agClear')) $('agClear').onclick = async () => { if (!(await uiConfirm('清空所有已完成事项吗？'))) return; const dd = D(); dd.items = dd.items.filter(i => !i.done); S(dd); render(); };
     }
     function cal(d, body) {
@@ -125,7 +141,8 @@
         let h = '<div class="ag-cal"><div class="hd"><button id="agPm">‹</button><span>' + calY + '年' + (calM + 1) + '月</span><button id="agNm">›</button></div><div class="g">' + WK.map(w => '<div class="w">' + w + '</div>').join('') + cells + '</div></div>';
         const day = d.items.filter(x => x.date === calSel).sort(cmp);
         h += '<div class="ag-grp">' + dateLabel(calSel) + '（' + day.length + '）</div>' + (day.length ? day.map(x => itemRow(d, x)).join('') : '<div class="xa-empty" style="padding:18px">这天没有安排</div>');
-        body.innerHTML = h; bindItems(body);
+        h += quickBar(d, calSel);
+        body.innerHTML = h; bindItems(body); bindQuick(calSel);
         $('agPm').onclick = () => { calM--; if (calM < 0) { calM = 11; calY--; } render(); }; $('agNm').onclick = () => { calM++; if (calM > 11) { calM = 0; calY++; } render(); };
         body.querySelectorAll('[data-d]').forEach(e => e.onclick = () => { calSel = e.dataset.d; render(); });
     }
@@ -137,16 +154,17 @@
     }
     function editSheet(id) {
         const d = D(), it = id ? d.items.find(x => x.id === id) : null, c = getChar(getActiveCharId());
-        const x = it || { title: '', note: '', date: view.t === 'smart' && view.k === 'today' ? T() : '', time: '', repeat: 'none', pri: 0, list: view.t === 'list' ? view.id : d.lists[0].id, ta: false };
+        const dl = d.lists.some(l => l.id === (view.list || lastList)) ? (view.list || lastList) : d.lists[0].id;
+        const x = it || { title: '', note: '', date: view.t === 'today' ? T() : view.t === 'cal' ? calSel : '', time: '', repeat: 'none', pri: 0, list: dl, ta: false };
         const opt = (o, cur) => Object.keys(o).map(k => '<option value="' + k + '"' + (String(cur) === String(k) ? ' selected' : '') + '>' + o[k] + '</option>').join('');
         const m = sheet('<h3>' + (it ? '编辑提醒' : '新提醒') + '</h3>'
             + '<div class="xa-row"><input id="aeT" style="text-align:left;max-width:100%;width:100%;font-size:16px" placeholder="标题" value="' + esc(x.title) + '"></div>'
+            + '<div class="xa-row"><span>放入列表</span><select id="aeL">' + d.lists.map(l => '<option value="' + l.id + '"' + (l.id === x.list ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('') + '</select></div>'
             + '<div class="xa-row"><textarea id="aeN" placeholder="备注" style="width:100%;border:none;background:transparent;color:var(--text-main);font-size:14px;outline:none;min-height:54px;resize:none;font-family:inherit">' + esc(x.note) + '</textarea></div>'
             + '<div class="xa-row"><span>日期</span><input type="date" id="aeD" value="' + esc(x.date) + '"></div>'
             + '<div class="xa-row"><span>时间</span><input type="time" id="aeTm" value="' + esc(x.time) + '"></div>'
             + '<div class="xa-row"><span>重复</span><select id="aeR">' + opt(REPEAT, x.repeat || 'none') + '</select></div>'
             + '<div class="xa-row"><span>优先级</span><select id="aeP">' + opt(PRI, x.pri || 0) + '</select></div>'
-            + '<div class="xa-row"><span>列表</span><select id="aeL">' + d.lists.map(l => '<option value="' + l.id + '"' + (l.id === x.list ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('') + '</select></div>'
             + '<div class="xa-row"><span>' + (c ? '让 ' + esc(c.name) + ' 来提醒我' : '让 TA 来提醒我') + '</span><input type="checkbox" id="aeTa" class="ios-switch"' + (x.ta ? ' checked' : '') + '></div>'
             + '<div class="xa-btns">' + (it ? '<button class="dan" id="aeDel">删除</button>' : '') + '<button id="aeCancel">取消</button><button class="pri" id="aeOk">保存</button></div>');
         const g = (i) => m.querySelector('#' + i);
@@ -157,7 +175,7 @@
             const dd = D(), o = { title: t, note: g('aeN').value.trim(), date: g('aeD').value, time: g('aeD').value ? g('aeTm').value : '', repeat: g('aeR').value, pri: +g('aeP').value, list: g('aeL').value, ta: g('aeTa').checked };
             if (g('aeTa').checked && typeof Notification !== 'undefined' && Notification.permission === 'default') { try { Notification.requestPermission(); } catch (e) { } }
             if (it) { const z = dd.items.find(q => q.id === id); Object.assign(z, o, { fired: '' }); } else dd.items.push(Object.assign({ id: uid(), done: false }, o));
-            S(dd); m.remove(); render();
+            lastList = o.list; S(dd); m.remove(); render();
         };
         setTimeout(() => { if (!it) g('aeT').focus(); }, 80);
     }
@@ -166,8 +184,8 @@
         const m = sheet('<h3>' + (l ? '编辑列表' : '新建列表') + '</h3><div class="xa-row"><input id="alN" style="text-align:left;max-width:100%;width:100%;font-size:16px" placeholder="列表名称" value="' + esc(l ? l.name : '') + '"></div><div class="cd-colors" id="alC">' + COLORS.map(c => '<i data-c="' + c + '" style="background:' + c + '"' + (c === col ? ' class="on"' : '') + '></i>').join('') + '</div><div class="xa-btns">' + (l && d.lists.length > 1 ? '<button class="dan" id="alDel">删除</button>' : '') + '<button id="alCancel">取消</button><button class="pri" id="alOk">保存</button></div>');
         m.querySelectorAll('#alC i').forEach(i => i.onclick = () => { col = i.dataset.c; m.querySelectorAll('#alC i').forEach(z => z.classList.toggle('on', z === i)); });
         m.querySelector('#alCancel').onclick = () => m.remove();
-        if (l && d.lists.length > 1) m.querySelector('#alDel').onclick = async () => { if (!(await uiConfirm('删除列表「' + l.name + '」？里面的提醒也会一起删除'))) return; const dd = D(); dd.lists = dd.lists.filter(x => x.id !== id); dd.items = dd.items.filter(x => x.list !== id); S(dd); m.remove(); view = { t: 'home' }; render(); };
-        m.querySelector('#alOk').onclick = () => { const n = m.querySelector('#alN').value.trim(); if (!n) { uiAlert('给列表起个名字'); return; } const dd = D(); if (l) { const z = dd.lists.find(x => x.id === id); z.name = n; z.color = col; view.name = n; view.color = col; } else dd.lists.push({ id: uid(), name: n, color: col }); S(dd); m.remove(); render(); };
+        if (l && d.lists.length > 1) m.querySelector('#alDel').onclick = async () => { if (!(await uiConfirm('删除列表「' + l.name + '」？里面的提醒也会一起删除'))) return; const dd = D(); dd.lists = dd.lists.filter(x => x.id !== id); dd.items = dd.items.filter(x => x.list !== id); S(dd); m.remove(); view.list = ''; render(); };
+        m.querySelector('#alOk').onclick = () => { const n = m.querySelector('#alN').value.trim(); if (!n) { uiAlert('给列表起个名字'); return; } const dd = D(); if (l) { const z = dd.lists.find(x => x.id === id); z.name = n; z.color = col; } else { const nl = { id: uid(), name: n, color: col }; dd.lists.push(nl); view.list = nl.id; lastList = nl.id; } S(dd); m.remove(); render(); };
     }
     function settings() {
         const perm = typeof Notification === 'undefined' ? '当前浏览器不支持' : Notification.permission === 'granted' ? '已开启' : Notification.permission === 'denied' ? '已被浏览器拒绝' : '未开启';
@@ -188,7 +206,7 @@
                 try { pushHistory(c.id, { role: 'assistant', content: text }); showBanner(c, text); sent = true; } catch (e) { }
             }
         }
-        if (!sent) uiAlert('⏰ ' + msg, 6000);
+        if (!sent) uiAlert('◔ ' + msg, 6000);
         try { if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification('日程提醒', { body: it.title + (it.note ? '\n' + it.note : '') }); } catch (e) { }
     }
     function tick() {

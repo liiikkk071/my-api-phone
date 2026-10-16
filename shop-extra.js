@@ -186,16 +186,22 @@
         try {
             const cand = candidates(reason.k === 'any' ? '' : reason.k);
             const list = (cand.takeout.length ? '【外卖候选】' + cand.takeout.map((x) => x.m + '·' + x.name + ' ¥' + x.price).join('；') + '\n' : '') + (cand.shop.length ? '【网购候选】' + cand.shop.map((x) => x.name + ' ¥' + x.price).join('；') + '\n' : '');
+            const ANG = ['用你平时说话的方式随口一提，别太正式', '带点嘴硬或别扭，但能看出在意', '像刚想起来一样，语气随意', '带一点调侃或小吐槽', '只说很短的一两句，留白', '说一个此刻你这边正在发生的小细节再带出买东西', '用你的口头禅或习惯性语气词开头', '先问我一件小事，再顺带说买了东西', '不解释理由，直接说结果，像日常聊天', '带一点撒娇或不好意思，符合你的性格'];
+            const hist = (getHistory(id) || []).slice(-4).map((m) => (m.role === 'user' ? '我：' : c.name + '：') + String(m.content).slice(0, 40)).join('\n');
             const prompt = timeContext() + '\n【方向：你是买家/付钱的人，我（用户）是收到的人】' + reason.t + '。你决定主动给我买一样东西。\n' + list
-                + '请只从候选里选一个最符合你性格、也最适合此刻时间的（名称必须和候选完全一致；外卖约 30 分钟送达，网购要等快递）。\n只输出 JSON：{"kind":"takeout或shop","name":"候选里的名称","say":"你发给我的一句话：口语、有感情、40 字内，必须说清楚是「你给我」买的，并符合此刻时间"}';
-            const j = parseJSONLoose(await callPersona(id, prompt, 1.0)) || {};
+                + (hist ? '【最近聊天，保持连贯】\n' + hist + '\n' : '')
+                + '请只从候选里选一个最符合你性格、也最适合此刻时间的（名称必须和候选完全一致；外卖约 30 分钟送达，网购要等快递）。\n'
+                + '写 say 时：完全以你自己的人设、说话习惯和与我的关系来说，不要套用通用模板；禁止以「给你买了/给你点了」这类固定句式开头；不要复述我给你的任何提示词；本次风格倾向：' + pick(ANG) + '。\n只输出 JSON：{"kind":"takeout或shop","name":"候选里的名称","say":"你发给我的话，口语，40 字内，要让我明白东西是你买给我的，但表达方式完全由你的性格决定"}';
+            const j = parseJSONLoose(await callPersona(id, prompt, 1.1)) || {};
             let kind = j.kind === 'takeout' ? 'takeout' : 'shop', name = String(j.name || ''), price = 0, shop = '';
             const find = (arr) => arr.find((x) => x.name === name) || arr.find((x) => name && (x.name.indexOf(name) >= 0 || name.indexOf(x.name) >= 0));
             let hit = kind === 'takeout' ? find(cand.takeout) : find(cand.shop);
             if (!hit) { const pool = kind === 'takeout' ? cand.takeout : cand.shop; hit = pool.length ? pick(pool) : null; if (!hit) { const o = cand.takeout.length ? cand.takeout : cand.shop; hit = pick(o); kind = cand.takeout.length ? 'takeout' : 'shop'; } }
             if (!hit) return false;
             name = hit.name; price = hit.price; shop = hit.m || '';
-            const say = String(j.say || '').trim() || (kind === 'takeout' ? '给你点了份吃的，记得趁热吃。' : '给你买了点东西，快递到了告诉我。');
+            let say = String(j.say || '').trim();
+            if (!say) { try { say = String(await callPersona(id, '你刚主动给我' + (kind === 'takeout' ? '点了外卖' : '下单买了') + '「' + name + '」。用你自己的口吻发一句话告诉我，40字内，只输出这句话本身。', 1.1) || '').trim().replace(/^["“]|["”]$/g, ''); } catch (e) {} }
+            if (!say) say = '（' + c.name + '没说话，只是悄悄下了单）';
             const what = kind === 'takeout' ? '点了外卖「' + (shop ? shop + '·' : '') + name + '」¥' + price : '下单买了「' + name + '」¥' + price;
             pushHistory(id, { role: 'assistant', content: say + '\n（' + c.name + ' 主动给你' + what + '）' });
             logActivity(id, 'taBuy', '【你（' + c.name + '）→我（用户）】你主动给我' + what + '。买单的是你，收到的是我。');

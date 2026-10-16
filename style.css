@@ -1737,9 +1737,12 @@ html[data-theme=cream] .section-title,html[data-theme=cream] .hint-line{font-fam
 
 /* 桌面：文件夹 / 滑动翻页 */
 #desktop:not(.editing){touch-action:pan-y}
-.fo-bg{background:rgba(255,255,255,.42)!important;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);padding:5px!important;box-sizing:border-box;border:1px solid rgba(255,255,255,.7)}
-.fo-g{display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr;gap:3px;width:100%;height:100%}
-.fo-mini{display:block;border-radius:6px;background-size:cover;background-position:center;min-width:0;min-height:0}
+.fo-bg{padding:6px!important;box-sizing:border-box}
+.fo-g{display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:auto;align-content:center;align-items:center;gap:3px;width:100%;height:100%;overflow:hidden}
+.fo-mini{aspect-ratio:1/1;width:100%;display:flex;align-items:center;justify-content:center;border-radius:calc((var(--icon-radius) + 6px) * .3);background-size:cover;background-position:center;min-width:0;min-height:0;overflow:hidden}
+/* 文件夹里的小图标 = 桌面图标缩小版：同样的圆角比例、同样的玻璃底、同样的图案，不再是白色小方块 */
+.fo-mini.fo-plain{background:linear-gradient(150deg,rgba(255,255,255,.42),rgba(255,255,255,.12));box-shadow:inset 0 0 0 .5px rgba(255,255,255,.45)}
+#desktop .fo-mini svg{width:72%!important;height:72%!important;stroke-width:2!important;filter:none!important}
 #desktop.editing .hm-merge{outline:3px dashed rgba(255,255,255,.95);outline-offset:4px;border-radius:22px;transform:scale(1.1);transition:transform .12s}
 .hm-folder{position:absolute;inset:0;z-index:80;background:rgba(30,24,34,.42);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;animation:xaIn .18s ease}
 .hm-folder.hidden{display:none}
@@ -1755,4 +1758,4 @@ html[data-theme=cream] .section-title,html[data-theme=cream] .hint-line{font-fam
 .hf-tip{margin:10px 0 0;text-align:center;font-size:11px;color:rgba(255,255,255,.85)}
 
 html,body{overscroll-behavior-x:none}
-.fo-mini.fo-plain{background:rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;color:var(--theme-dark)}.fo-mini svg{width:68%;height:68%;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.fo-mini svg{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round}

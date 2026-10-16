@@ -22,4 +22,4 @@
 .bs-row input[type=color]{width:34px;height:26px;border:1px solid var(--border-color);border-radius:6px;padding:0;background:none}
 .bs-row .btn-secondary{width:auto;padding:0 16px}
 @media (prefers-reduced-motion:reduce){.bs *{animation-duration:.01s!important}}
-.bs-img.big{width:150%;max-width:none}
+

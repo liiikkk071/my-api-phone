@@ -47,6 +47,30 @@
         GLYPH.countdown = '<path d="M7 3.5h10M7 20.5h10"/><path d="M8 3.5c0 4 4 5 4 8.5s-4 4.5-4 8.5M16 3.5c0 4-4 5-4 8.5s4 4.5 4 8.5"/>';
     } catch (e) { }
 
+
+    // ---------- 美化：每个事件都能自己配样式 ----------
+    const THEMES = [['grad', '渐变'], ['solid', '纯色'], ['soft', '柔和'], ['line', '描边'], ['glass', '磨砂']];
+    const FONTS = [['round', '圆润', '"Yuanti SC","YouYuan","HYChangYuanTi","Microsoft YaHei",system-ui,sans-serif'], ['serif', '衬线', 'Georgia,"Songti SC","Noto Serif SC",serif'], ['mono', '等宽', 'ui-monospace,Menlo,Consolas,monospace'], ['hand', '手写', '"Segoe Script","Bradley Hand","Kaiti SC","KaiTi",cursive'], ['bold', '粗黑', '"Arial Black","Heiti SC","PingFang SC",sans-serif']];
+    const EMOJIS = ['♡', '★', '✦', '✧', '☾', '☼', '♪', '✿', '❀', '☁', '✉', '☺'];
+    const hexOk = (v) => /^#[0-9a-f]{6}$/i.test(v || '');
+    function mixHex(h, to, a) { // h 往 to(0=黑 255=白)混合 a
+        if (!hexOk(h)) return h; const n = [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16));
+        return '#' + n.map(v => ('0' + Math.round(v + (to - v) * a).toString(16)).slice(-2)).join('');
+    }
+    function lum(h) { if (!hexOk(h)) return .5; const n = [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16) / 255); return .299 * n[0] + .587 * n[1] + .114 * n[2]; }
+    function skin(it) { // 把事件上的样式整理成完整配置（兼容旧数据：只有 color）
+        const k = it.sk || {}, c1 = hexOk(k.c1) ? k.c1 : (hexOk(it.color) ? it.color : PAL[0]);
+        return { theme: THEMES.some(t => t[0] === k.theme) ? k.theme : 'grad', c1: c1, c2: hexOk(k.c2) ? k.c2 : mixHex(c1, 255, .28), txt: ['auto', 'light', 'dark'].indexOf(k.txt) >= 0 ? k.txt : 'auto', font: FONTS.some(f => f[0] === k.font) ? k.font : 'round', emoji: String(k.emoji || '').slice(0, 4), img: typeof k.img === 'string' && k.img.indexOf('data:image') === 0 ? k.img : '', dim: k.dim !== false };
+    }
+    function skinCss(sk) { // 返回 {cls, style}
+        const ff = (FONTS.find(f => f[0] === sk.font) || FONTS[0])[2];
+        const light = sk.theme === 'soft' || sk.theme === 'line' || sk.theme === 'glass';
+        let tx = sk.txt === 'light' ? '#ffffff' : sk.txt === 'dark' ? '#2b2230' : (sk.img ? '#ffffff' : light ? (lum(sk.c1) > .72 ? '#5a4650' : mixHex(sk.c1, 0, .25)) : (lum(sk.c1) > .8 ? '#2b2230' : '#ffffff'));
+        let st = '--c1:' + sk.c1 + ';--c2:' + sk.c2 + ';--tx:' + tx + ';--ff:' + ff + ';';
+        if (sk.img) st += 'background-image:' + (sk.dim ? 'linear-gradient(rgba(0,0,0,.30),rgba(0,0,0,.30)),' : '') + 'url(\'' + sk.img + '\');background-size:cover;background-position:center;';
+        return { cls: 'sk-' + sk.theme + (sk.img ? ' sk-img' : ''), style: st };
+    }
+
     let cat = '全部';
     function ensure() {
         if ($('countdownApp')) return;
@@ -63,13 +87,14 @@
         const all = d.items.slice().sort(sortFn); let h = '';
         if (!all.length) { body.innerHTML = '<div class="xa-empty">还没有倒数日<br>点右下角「＋」添加一个：生日、纪念日、考试、旅行…<br>也可以选「正数」，记录在一起已经多少天</div><div class="xa-btns"><button id="cdTpl">从节日里挑</button><button id="cdTa">导入和 TA 的纪念日</button></div>'; $('cdTpl').onclick = () => tplSheet(); $('cdTa').onclick = importTa; return; }
         const hero = all[0], hc = calc(hero);
-        h += '<div class="cd-hero" data-id="' + hero.id + '" style="background:linear-gradient(135deg,' + hero.color + ',' + hero.color + 'cc)"><div class="tt">' + esc(hero.title) + (hero.mode === 'up' ? ' · 已经' : hc.past ? ' · 已过' : ' · 还有') + '</div><div class="num">' + bigHtml(hc, hero) + '</div><div class="dt">' + (hero.mode === 'up' ? '起始日 ' : '目标日 ') + hc.date + ' ' + wk(hc.date) + '</div></div>';
+        const hs = skin(hero), hk = skinCss(hs);
+        h += '<div class="cd-hero ' + hk.cls + '" data-id="' + hero.id + '" style="' + hk.style + '">' + (hs.emoji ? '<span class="cd-emo">' + esc(hs.emoji) + '</span>' : '') + '<div class="tt">' + esc(hero.title) + (hero.mode === 'up' ? ' · 已经' : hc.past ? ' · 已过' : ' · 还有') + '</div><div class="num">' + bigHtml(hc, hero) + '</div><div class="dt">' + (hero.mode === 'up' ? '起始日 ' : '目标日 ') + hc.date + ' ' + wk(hc.date) + '</div></div>';
         const cats = ['全部', '倒数', '正数'].concat(CATS.filter(c => d.items.some(i => i.cat === c)));
         if (cats.indexOf(cat) < 0) cat = '全部';
         h += '<div class="cd-tabs">' + cats.map(c => '<button' + (c === cat ? ' class="on"' : '') + ' data-c="' + c + '">' + c + '</button>').join('') + '</div>';
         const rest = all.slice(1).filter(i => cat === '全部' || (cat === '倒数' ? i.mode !== 'up' : cat === '正数' ? i.mode === 'up' : i.cat === cat));
         const list = (cat === '全部' ? rest : all.filter(i => cat === '倒数' ? i.mode !== 'up' : cat === '正数' ? i.mode === 'up' : i.cat === cat));
-        h += list.map(it => { const c = calc(it); return '<div class="cd-it' + (c.past ? ' past' : '') + '" data-id="' + it.id + '" style="--cc:' + it.color + '"><div class="l"><div class="tt">' + esc(it.title) + (it.pin ? '<span class="cd-pin">置顶</span>' : '') + '</div><div class="sb">' + (it.mode === 'up' ? '起始 ' : '') + c.date + ' ' + wk(c.date) + (it.repeat && it.repeat !== 'none' ? ' · ' + REP[it.repeat] : '') + '</div></div><div class="r"><b>' + (c.today ? '今天' : c.n) + '</b><span>' + (c.today ? '到啦' : c.cap + (it.mode === 'up' ? '（天）' : '（天）')) + '</span></div></div>'; }).join('');
+        h += list.map(it => { const c = calc(it); const ks = skin(it), kk = skinCss(ks); return '<div class="cd-it ' + kk.cls + (c.past ? ' past' : '') + '" data-id="' + it.id + '" style="' + kk.style + '--cc:' + ks.c1 + '"><div class="l"><div class="tt">' + (ks.emoji ? '<span class="cd-eico">' + esc(ks.emoji) + '</span>' : '') + esc(it.title) + (it.pin ? '<span class="cd-pin">置顶</span>' : '') + '</div><div class="sb">' + (it.mode === 'up' ? '起始 ' : '') + c.date + ' ' + wk(c.date) + (it.repeat && it.repeat !== 'none' ? ' · ' + REP[it.repeat] : '') + '</div></div><div class="r"><b>' + (c.today ? '今天' : c.n) + '</b><span>' + (c.today ? '到啦' : c.cap + (it.mode === 'up' ? '（天）' : '（天）')) + '</span></div></div>'; }).join('');
         body.innerHTML = h;
         body.querySelectorAll('[data-id]').forEach(e => e.onclick = () => detail(e.dataset.id));
         body.querySelectorAll('[data-c]').forEach(e => e.onclick = () => { cat = e.dataset.c; render(); });
@@ -79,14 +104,16 @@
         let ysub = '';
         if (it.mode === 'up') ysub = c.n && it.date <= t ? '从 ' + it.date + ' 到今天，一共 ' + ymd(it.date, t) : '';
         else ysub = c.past ? ymd(c.date, t) + '前' : (c.today ? '' : '还有 ' + ymd(t, c.date));
-        const m = sheet('<div class="cd-det" style="--cc:' + it.color + '"><div style="font-size:16px;color:var(--text-main);font-weight:600">' + esc(it.title) + '</div><div class="num">' + (c.today ? '今天' : c.n + '<small>天</small>') + '</div><div class="ymd">' + (it.mode === 'up' ? '已经 · ' : c.past ? '已经过去 · ' : '还有 · ') + (ysub ? esc(ysub) : '') + '</div><div class="ymd">' + (it.mode === 'up' ? '起始日 ' : '目标日 ') + c.date + ' ' + wk(c.date) + ' · ' + (it.mode === 'up' ? '正数日' : '倒数日') + (it.cat ? ' · ' + esc(it.cat) : '') + (it.repeat && it.repeat !== 'none' ? ' · ' + REP[it.repeat] : '') + '</div>' + (it.note ? '<div class="ymd" style="margin-top:10px;color:var(--text-main)">' + esc(it.note) + '</div>' : '') + '</div><div class="xa-btns"><button id="dtPin">' + (it.pin ? '取消置顶' : '置顶') + '</button><button id="dtEdit">编辑</button><button class="dan" id="dtDel">删除</button></div>');
+        const dk = skin(it), dc = skinCss(dk);
+        const m = sheet('<div class="cd-det" style="--cc:' + dk.c1 + ';--ff:' + (FONTS.find(f => f[0] === dk.font) || FONTS[0])[2] + '">' + (dk.emoji ? '<div style="font-size:34px">' + esc(dk.emoji) + '</div>' : '') + '<div style="font-size:16px;color:var(--text-main);font-weight:600">' + esc(it.title) + '</div><div class="num">' + (c.today ? '今天' : c.n + '<small>天</small>') + '</div><div class="ymd">' + (it.mode === 'up' ? '已经 · ' : c.past ? '已经过去 · ' : '还有 · ') + (ysub ? esc(ysub) : '') + '</div><div class="ymd">' + (it.mode === 'up' ? '起始日 ' : '目标日 ') + c.date + ' ' + wk(c.date) + ' · ' + (it.mode === 'up' ? '正数日' : '倒数日') + (it.cat ? ' · ' + esc(it.cat) : '') + (it.repeat && it.repeat !== 'none' ? ' · ' + REP[it.repeat] : '') + '</div>' + (it.note ? '<div class="ymd" style="margin-top:10px;color:var(--text-main)">' + esc(it.note) + '</div>' : '') + '</div><div class="xa-btns"><button id="dtPin">' + (it.pin ? '取消置顶' : '置顶') + '</button><button id="dtEdit">编辑</button><button class="dan" id="dtDel">删除</button></div>');
         m.querySelector('#dtPin').onclick = () => { const dd = D(); dd.items.forEach(x => { if (x.id === id) x.pin = !x.pin; else if (!it.pin) x.pin = false; }); S(dd); m.remove(); render(); };
         m.querySelector('#dtEdit').onclick = () => { m.remove(); edit(id); };
         m.querySelector('#dtDel').onclick = async () => { if (!(await uiConfirm('删除「' + it.title + '」？'))) return; const dd = D(); dd.items = dd.items.filter(x => x.id !== id); S(dd); m.remove(); render(); };
     }
     function edit(id, pre) {
         const d = D(), it = id ? d.items.find(x => x.id === id) : null, x = it || Object.assign({ title: '', date: T(), mode: 'down', cat: '纪念日', repeat: 'none', note: '', color: PAL[Math.floor(Math.random() * PAL.length)], pin: false }, pre || {});
-        let mode = x.mode || 'down', col = x.color;
+        let mode = x.mode || 'down'; const sk = skin(x);
+        const chips = (arr, cur, key) => arr.map(a => '<button data-k="' + key + '" data-v="' + a[0] + '" class="' + (a[0] === cur ? 'on' : '') + '">' + a[1] + '</button>').join('');
         const m = sheet('<h3>' + (it ? '编辑' : '添加') + '</h3><div class="cd-seg" id="ceM"><button data-m="down">倒数日</button><button data-m="up">正数日</button></div>'
             + '<div class="xa-row"><input id="ceT" style="text-align:left;max-width:100%;width:100%;font-size:16px" placeholder="事件名称，例如：和 TA 的生日" value="' + esc(x.title) + '"></div>'
             + '<div class="xa-row"><span id="ceDl">目标日</span><input type="date" id="ceD" value="' + esc(x.date) + '"></div>'
@@ -94,16 +121,39 @@
             + '<div class="xa-row"><span>重复</span><select id="ceR">' + Object.keys(REP).map(k => '<option value="' + k + '"' + (k === (x.repeat || 'none') ? ' selected' : '') + '>' + REP[k] + '</option>').join('') + '</select></div>'
             + '<div class="xa-row"><span>置顶</span><input type="checkbox" class="ios-switch" id="cePin"' + (x.pin ? ' checked' : '') + '></div>'
             + '<div class="xa-row"><input id="ceN" style="text-align:left;max-width:100%;width:100%" placeholder="备注（可不填）" value="' + esc(x.note || '') + '"></div>'
-            + '<div class="cd-colors" id="ceCol">' + PAL.map(c => '<i data-c="' + c + '" style="background:' + c + '"' + (c === col ? ' class="on"' : '') + '></i>').join('') + '</div>'
-            + '<p style="font-size:12px;color:var(--text-sub);margin:0 4px 6px;line-height:1.6" id="ceHint"></p><div class="xa-btns"><button id="ceCancel">取消</button><button class="pri" id="ceOk">保存</button></div>');
+            + '<div class="xa-title" style="margin-top:14px">✧ 自己美化这张卡片（实时预览）</div><div class="cd-hero cd-prev" id="cePrev"></div>'
+            + '<div class="cd-lab">样式</div><div class="cd-chip" id="ceTh">' + chips(THEMES, sk.theme, 'theme') + '</div>'
+            + '<div class="cd-lab">颜色（点色块选，或用右边的取色器自定义）</div><div class="cd-colors" id="ceCol">' + PAL.map(c => '<i data-c="' + c + '" style="background:' + c + '"></i>').join('') + '<label class="cd-pick" title="自定义主色"><input type="color" id="ceC1"><b>主色</b></label><label class="cd-pick" title="渐变的另一端"><input type="color" id="ceC2"><b>渐变色</b></label></div>'
+            + '<div class="cd-lab">文字颜色</div><div class="cd-chip" id="ceTx">' + chips([['auto', '自动'], ['light', '白字'], ['dark', '深色字']], sk.txt, 'txt') + '</div>'
+            + '<div class="cd-lab">数字字体</div><div class="cd-chip" id="ceFt">' + FONTS.map(f => '<button data-k="font" data-v="' + f[0] + '" style="font-family:' + f[2] + '" class="' + (f[0] === sk.font ? 'on' : '') + '">' + f[1] + '</button>').join('') + '</div>'
+            + '<div class="cd-lab">小贴纸（符号，可不选）</div><div class="cd-chip" id="ceEm"><button data-e="" class="">无</button>' + EMOJIS.map(e => '<button data-e="' + e + '">' + e + '</button>').join('') + '<input id="ceEmIn" maxlength="4" placeholder="自己输入" class="cd-emin"></div>'
+            + '<div class="cd-lab">背景图片（自己上传喜欢的照片）</div><div class="cd-chip"><button id="ceImgUp">选择图片</button><button id="ceImgClr">清除图片</button><button id="ceDim" class="' + (sk.dim ? 'on' : '') + '">压暗保证文字清晰</button></div><input type="file" id="ceFile" accept="image/*" style="display:none">'
+            + '<p style="font-size:12px;color:var(--text-sub);margin:8px 4px 6px;line-height:1.6" id="ceHint"></p><div class="xa-btns"><button id="ceCancel">取消</button><button class="pri" id="ceOk">保存</button></div>');
         const g = (i) => m.querySelector('#' + i);
-        const setMode = () => { m.querySelectorAll('#ceM button').forEach(b => b.classList.toggle('on', b.dataset.m === mode)); g('ceDl').textContent = mode === 'up' ? '起始日' : '目标日'; g('ceHint').textContent = mode === 'up' ? '正数日：从起始日开始往后数，比如「在一起」「戒糖」，起始日当天算第 1 天。' : '倒数日：数到目标日还有多少天；重复事件（生日、纪念日）会自动算下一次。'; };
-        m.querySelectorAll('#ceM button').forEach(b => b.onclick = () => { mode = b.dataset.m; setMode(); }); setMode();
-        m.querySelectorAll('#ceCol i').forEach(i => i.onclick = () => { col = i.dataset.c; m.querySelectorAll('#ceCol i').forEach(z => z.classList.toggle('on', z === i)); });
+        function paint() {
+            const k = skinCss(sk), pv = g('cePrev'); pv.className = 'cd-hero cd-prev ' + k.cls; pv.style.cssText = k.style;
+            pv.innerHTML = (sk.emoji ? '<span class="cd-emo">' + esc(sk.emoji) + '</span>' : '') + '<div class="tt">' + esc(g('ceT').value.trim() || '事件名称') + (mode === 'up' ? ' · 已经' : ' · 还有') + '</div><div class="num">' + (mode === 'up' ? '100' : '30') + '<small>天</small></div><div class="dt">' + (g('ceD').value || T()) + '</div>';
+            m.querySelectorAll('#ceCol i').forEach(i => i.classList.toggle('on', i.dataset.c.toLowerCase() === sk.c1.toLowerCase()));
+            g('ceC1').value = sk.c1; g('ceC2').value = sk.c2;
+            [['ceTh', 'theme'], ['ceTx', 'txt'], ['ceFt', 'font']].forEach(p => g(p[0]).querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === sk[p[1]])));
+            g('ceEm').querySelectorAll('button[data-e]').forEach(b => b.classList.toggle('on', b.dataset.e === sk.emoji));
+            g('ceDim').classList.toggle('on', sk.dim); g('ceImgClr').style.display = sk.img ? '' : 'none'; g('ceDim').style.display = sk.img ? '' : 'none';
+        }
+        const setMode = () => { m.querySelectorAll('#ceM button').forEach(b => b.classList.toggle('on', b.dataset.m === mode)); g('ceDl').textContent = mode === 'up' ? '起始日' : '目标日'; g('ceHint').textContent = mode === 'up' ? '正数日：从起始日开始往后数，比如「在一起」「戒糖」，起始日当天算第 1 天。' : '倒数日：数到目标日还有多少天；重复事件（生日、纪念日）会自动算下一次。'; paint(); };
+        m.querySelectorAll('#ceM button').forEach(b => b.onclick = () => { mode = b.dataset.m; setMode(); });
+        m.querySelectorAll('#ceTh button,#ceTx button,#ceFt button').forEach(b => b.onclick = () => { sk[b.dataset.k] = b.dataset.v; paint(); });
+        m.querySelectorAll('#ceCol i').forEach(i => i.onclick = () => { sk.c1 = i.dataset.c; sk.c2 = mixHex(sk.c1, 255, .28); paint(); });
+        g('ceC1').oninput = (e) => { sk.c1 = e.target.value; paint(); }; g('ceC2').oninput = (e) => { sk.c2 = e.target.value; paint(); };
+        m.querySelectorAll('#ceEm button[data-e]').forEach(b => b.onclick = () => { sk.emoji = b.dataset.e; g('ceEmIn').value = ''; paint(); });
+        g('ceEmIn').oninput = (e) => { sk.emoji = e.target.value.trim().slice(0, 4); paint(); };
+        g('ceImgUp').onclick = () => g('ceFile').click();
+        g('ceFile').onchange = function () { const f = this.files && this.files[0]; if (!f) return; readImageCompressed(f, (u) => { sk.img = u; paint(); }, 700); this.value = ''; };
+        g('ceImgClr').onclick = () => { sk.img = ''; paint(); }; g('ceDim').onclick = () => { sk.dim = !sk.dim; paint(); };
+        g('ceT').oninput = paint; g('ceD').onchange = paint; setMode();
         g('ceCancel').onclick = () => m.remove();
         g('ceOk').onclick = () => {
             const t = g('ceT').value.trim(), dt = g('ceD').value; if (!t) { uiAlert('给它起个名字'); return; } if (!dt) { uiAlert('选一个日期'); return; }
-            const dd = D(), o = { title: t, date: dt, mode: mode, cat: g('ceC').value, repeat: mode === 'up' ? 'none' : g('ceR').value, note: g('ceN').value.trim(), color: col, pin: g('cePin').checked };
+            const dd = D(), o = { title: t, date: dt, mode: mode, cat: g('ceC').value, repeat: mode === 'up' ? 'none' : g('ceR').value, note: g('ceN').value.trim(), color: sk.c1, sk: { theme: sk.theme, c1: sk.c1, c2: sk.c2, txt: sk.txt, font: sk.font, emoji: sk.emoji, img: sk.img, dim: sk.dim }, pin: g('cePin').checked };
             if (o.pin) dd.items.forEach(z => z.pin = false);
             if (it) Object.assign(dd.items.find(z => z.id === id), o); else dd.items.push(Object.assign({ id: uid() }, o));
             S(dd); m.remove(); render();

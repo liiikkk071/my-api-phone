@@ -72,9 +72,9 @@
         let lvl = 0.86, chg = false;
         const draw = () => { el.innerHTML = '<svg class="sb-ic" width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>'
             + '<svg class="sb-ic" width="17" height="12" viewBox="0 0 17 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M1 4.2a11 11 0 0 1 15 0M3.6 7a7 7 0 0 1 9.8 0"/><circle cx="8.5" cy="10" r="1.2" fill="currentColor" stroke="none"/></svg>'
-            + '<span class="sb-bat"><i style="width:' + Math.max(8, Math.round(lvl * 100)) + '%"></i></span>' + (chg ? '<small>⚡</small>' : '') + '<span class="sb-pct">' + Math.round(lvl * 100) + '</span>'; };
+            + '<span class="sb-bat"><i style="width:' + Math.max(8, Math.round(lvl * 100)) + '%"></i></span>' + (chg ? '<small>ϟ</small>' : '') + '<span class="sb-pct">' + Math.round(lvl * 100) + '</span>'; };
         draw();
-        if (navigator.getBattery) navigator.getBattery().then(b => { const u = () => { lvl = b.level; chg = b.charging; draw(); }; u(); b.addEventListener('levelchange', u); b.addEventListener('chargingchange', u); }).catch(() => {});
+        const sync = () => { try { const b = window.batteryNow && window.batteryNow(); if (b) { lvl = b.level / 100; chg = b.charging; draw(); } } catch (e) {} }; sync(); document.addEventListener('batterychange', sync); setTimeout(sync, 1500);
     })();
 
     // ---------- 编辑模式 ----------

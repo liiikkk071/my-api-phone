@@ -32,7 +32,7 @@
         sprites(); mode === 'dress' ? dressUI() : drawUI();
     }
     function dressUI() {
-        const M = $('hcMain'); let h = '<div class="hc-tools"><button id="hcRnd">🎲 随机一套</button>' + (cur.custom ? '<button id="hcUnc" class="warn">正在使用手绘，点此改回装扮</button>' : '') + '</div>';
+        const M = $('hcMain'); let h = '<div class="hc-tools"><button id="hcRnd">⁂ 随机一套</button>' + (cur.custom ? '<button id="hcUnc" class="warn">正在使用手绘，点此改回装扮</button>' : '') + '</div>';
         h += '<div class="hl-tabs hc-g">' + GROUPS.map((g, i) => '<button data-g="' + i + '"' + (i === grp ? ' class="on"' : '') + '>' + g.t + '</button>').join('') + '</div><div class="hc-rows">';
         GROUPS[grp].rows.forEach((r, ri) => {
             if (r[0] === 'x') { h += '<div class="hl-sub">表情预设（一键换眼睛+嘴巴）</div><div class="hl-chips">' + A.EXPRS.map((e, i) => '<button data-ex="' + i + '">' + esc(e[0]) + '</button>').join('') + '</div>'; }

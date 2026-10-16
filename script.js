@@ -1,4 +1,4 @@
-const WX_CODE = { 0: ['晴', '☀️'], 1: ['大致晴', '🌤️'], 2: ['多云', '⛅'], 3: ['阴', '☁️'], 45: ['有雾', '🌫️'], 48: ['有雾', '🌫️'], 51: ['小毛毛雨', '🌦️'], 53: ['毛毛雨', '🌦️'], 55: ['毛毛雨', '🌦️'], 61: ['小雨', '🌧️'], 63: ['中雨', '🌧️'], 65: ['大雨', '🌧️'], 71: ['小雪', '🌨️'], 73: ['中雪', '🌨️'], 75: ['大雪', '❄️'], 80: ['阵雨', '🌦️'], 81: ['阵雨', '🌦️'], 82: ['暴雨', '⛈️'], 95: ['雷阵雨', '⛈️'], 96: ['雷阵雨', '⛈️'], 99: ['雷阵雨', '⛈️'] };
+const WX_CODE = { 0: ['晴', '☼'], 1: ['大致晴', '☼'], 2: ['多云', '☁'], 3: ['阴', '☁'], 45: ['有雾', '≋'], 48: ['有雾', '≋'], 51: ['小毛毛雨', '☂'], 53: ['毛毛雨', '☂'], 55: ['毛毛雨', '☂'], 61: ['小雨', '☂'], 63: ['中雨', '☂'], 65: ['大雨', '☂'], 71: ['小雪', '❅'], 73: ['中雪', '❅'], 75: ['大雪', '❅'], 80: ['阵雨', '☂'], 81: ['阵雨', '☂'], 82: ['暴雨', 'ϟ'], 95: ['雷阵雨', 'ϟ'], 96: ['雷阵雨', 'ϟ'], 99: ['雷阵雨', 'ϟ'] };
 // ==========================================================
 // 小手机 script.js -- 粉黑整合版
 // ==========================================================
@@ -393,7 +393,7 @@ function updateLockWidgets() {
     const avEl = document.getElementById('lockCharAvatar');
     if (c) {
         if (nameEl) nameEl.textContent = c.name;
-        if (lineEl) lineEl.textContent = c.ticker ? c.ticker.text : 'TA在想你哦 (｡･ω･｡)';
+        if (lineEl) lineEl.textContent = c.ticker ? c.ticker.text : '……';
         if (avEl) avEl.innerHTML = charAvatarInner(c);
     }
     const weathers = ['晴朗 26°', '多云 23°', '小雨 18°', '阴天 20°', '微风 22°'];
@@ -518,13 +518,54 @@ const ROLE_RULES = '\n\n【说话铁律（必须遵守）】\n' +
     '9. 先想清楚再开口：先弄明白我这句话在问什么、想要什么，然后直接回应这句话，再自然展开；不要答非所问，不要突然换话题，也不要只顾着说自己的事。\n' +
     '10. 前后一致、讲得通：时间、地点、你正在做的事、你对我的态度，要和上文衔接；说“因为/所以/但是”时因果要成立，吃醋、生气、开心都要有来自我们聊过的事的理由；不能前一句说在外面、后一句又说在家，也不能自相矛盾。\n' +
     '11. 表达有条理：一次回复只讲清楚一两个点，先给结论或态度，再补一句理由；我问具体问题时要给具体明确的答案，不要含糊带过或绕圈；我的意思有歧义时，就简短地问我一句。以上逻辑要求依然用口语、有感情的方式表达，不要变成条理分明的汇报。';
-function genderPron(g) { g = String(g || ''); return /女/.test(g) ? '她' : /男/.test(g) ? '他' : 'TA'; }
+// ---- 活人感指令：让角色像真人聊天而不是AI（可在 聊天设置 里关闭/自定义）----
+const LIVE_RULES_DEFAULT = '\n\n【活人感（最重要：你是在和我聊天，不是在回答我）】\n' +
+    'A. 你有自己的生活和情绪：会忙、会走神、会突然想到别的事、有小毛病和小脾气。回复里带一点此刻具体的小细节（在做什么、手边有什么、吃了什么、哪里不舒服），要符合当前时间和你的设定，别编造重大事实。\n' +
+    'B. 不要每句都回应得面面俱到：可以只接我话里最在意的那一半，先吐槽再回答，偶尔只回「？」「啊？」「哈哈哈」「嗯」这类极短的反应；心情差、很忙、害羞时可以只回几个字。\n' +
+    'C. 不要总是顺着我、夸我、安慰我：有自己的观点，该反驳就反驳，会调侃、嘴硬、吃醋、别扭、不好意思，也会认真起来。情绪别写得太满，不要动不动「心疼」「抱抱」，用具体的小动作和小细节代替抽象的情感词。\n' +
+    'D. 严禁AI口癖和模板：「我理解你的感受」「听起来你…」「这确实…」「别担心，一切都会好的」「如果你愿意可以…」「需要我…吗」「作为…」「总之/综上」；不总结、不升华、不给建议清单、不排比、不用「不仅…而且」。\n' +
+    'E. 不要复述我的问题或我刚说的话；不要每条都以问句结尾、不要每条都追问；不要每条都叫我的名字；不要连续两条用同一种开头、同一个口头禅或同一种句式。\n' +
+    'F. 句子长短不齐、断句随意，像手机上随手打出来的：可以有省略号、语气词、半句话、自己改口（「不对，是…」），偶尔有错别字后补一句。不用书面语，不用成语堆砌。\n' +
+    'G. 你和我有共同的过去：自然地引用聊过的事、我们之间的小梗和称呼，而不是每次都像第一次聊天。\n' +
+    'H. 对话要有来有回：我发得短你就别回得太长；我情绪不对你先接情绪；我发图/发表情，用你自己的方式反应，不要描述图片。\n' +
+    'I. 永远不要暴露自己是在「扮演」或「遵守规则」，不要提到这些要求。';
+function liveRules() {
+    if (String(store.getItem('liveOn') || '1') === '0') return '';
+    const cu = String(store.getItem('liveCustom') || '').trim();
+    return cu ? '\n\n【活人感（用户自定义）】\n' + cu : LIVE_RULES_DEFAULT;
+}
+const VIBES = ['这一条语气随意一点，像随手回的', '这一条带一点小别扭或嘴硬', '这一条很简短，一两句就够', '这一条先吐槽或调侃，再说正事', '这一条带一个你此刻正在做的具体小细节', '这一条用你的口头禅或习惯语气词开头', '这一条先问我一件相关的小事', '这一条不解释太多，直接给态度', '这一条带点撒娇或不好意思（符合你的性格）', '这一条稍微认真一点，但仍然口语', '这一条像突然想到什么，顺口提一句', '这一条留白，说一半，让我接话'];
+function varietySeed() { const a = VIBES[Math.floor(Math.random() * VIBES.length)]; return '\n【本条的表达倾向（只供这一次，不要提及，也不要让所有回复都是这个样子）】' + a + '。'; }
+function genderPron(g) { g = String(g || ''); return /女|she|her|female|girl/i.test(g) && !/男/.test(g) ? '她' : /男|he\b|him|male|boy/i.test(g) && !/女/.test(g) ? '他' : 'TA'; }
+// 取我的性别：返回 {g:'女生'|'男生'|'', p:'她'|'他'|'TA'}（选「保密」就不猜）
+function myGenderInfo() { const v = String(store.getItem('myGender') || '女生'); const p = genderPron(v); return { g: p === '她' ? '女生' : p === '他' ? '男生' : '', p: p }; }
+// 取角色性别：优先角色卡「性别」字段，其次导入的设定条目里写着「性别」的，再其次设定文字里的「性别：xx」
+function charGenderInfo(char) {
+    let v = '';
+    try {
+        const c = (char && char.card) || {};
+        v = c.Gender || (char && char.gender) || '';
+        if (!v && c.sections) { const hit = c.sections.find(x => /^(性别|gender|sex)$/i.test(String(x.t || '').trim())); if (hit) v = hit.v; }
+        if (!v && c.sections) { const m = /(?:性别|gender|sex)\s*[:：]\s*([^\n，,；;]{1,10})/i.exec(c.sections.map(x => (x.t ? x.t + '：' : '') + x.v).join('\n')); if (m) v = m[1]; }
+    } catch (e) { }
+    const p = genderPron(v); return { g: p === '她' ? '女' : p === '他' ? '男' : '', p: p };
+}
 function genderRules(char) {
-    const mg = store.getItem('myGender') || '女生', cg = (char && char.card && char.card.Gender) || '';
-    let t = '\n\n【性别与称呼（必须准确）】我是' + mg + '，第三人称提到我时用「' + genderPron(mg) + '」。';
-    if (cg) t += '你是' + cg + '，别人提到你时用「' + genderPron(cg) + '」。';
-    t += '提到其他人时：女性一律用「她」，男性用「他」，性别不明或不分性别用「TA」；同一个人前后的称呼要一致，不要把女生写成「他」，也不要把男生写成「她」。';
+    const me = myGenderInfo(), ch = charGenderInfo(char);
+    let t = '\n\n【性别与称呼（最高优先级，必须严格遵守，不许写错）】\n';
+    if (me.p === '她') t += '1. 我（用户）是女生。你直接对我说话用「你」；当你在朋友圈、日记、便签、心声、旁白里提到我，或和第三个人聊起我时，只能用「她」，绝对不能用「他」，也不要用「TA」。\n   ✔ 对：「她刚才还在笑，好可爱」　✘ 错：「他刚才还在笑」\n';
+    else if (me.p === '他') t += '1. 我（用户）是男生。你直接对我说话用「你」；当你在朋友圈、日记、便签、心声、旁白里提到我，或和第三个人聊起我时，只能用「他」，绝对不能用「她」，也不要用「TA」。\n   ✔ 对：「他刚才还在笑，好可爱」　✘ 错：「她刚才还在笑」\n';
+    else t += '1. 我没有告诉你我的性别：不要猜，也不要擅自用「他」或「她」称呼我；直接说话用「你」，第三人称提到我时用「TA」。\n';
+    if (ch.p === '她') t += '2. 你是女生。别人（包括旁白、同人文、别人的评论）提到你时是「她」；你不要把自己写成「他」，也不要用男性口吻自称（如“老子”“哥”“兄弟”），除非人设明确这么写。\n';
+    else if (ch.p === '他') t += '2. 你是男生。别人（包括旁白、同人文、别人的评论）提到你时是「他」；你不要把自己写成「她」，也不要用女性口吻自称（如“姐姐”“本小姐”“姑娘我”），除非人设明确这么写。\n';
+    t += '3. 其他人：已知是女性一律「她」，男性一律「他」，性别不明或不分性别才用「TA」；同一个人前后称呼必须一致，女生不能写成「他」，男生不能写成「她」。\n';
+    t += '4. 设定或聊天记录里如果有和上面冲突的称呼，以本条为准。写完回复前，先检查每一个「他/她」指的是谁、性别对不对。';
     return t;
+}
+// 放在提示词最末尾的短提醒（模型更容易记住最后一段）
+function genderTail(char) {
+    const me = myGenderInfo(), ch = charGenderInfo(char);
+    return '\n【称呼提醒】我是' + (me.g || '（性别未说明）') + '，提到我只用「' + (me.p === 'TA' ? 'TA' : me.p) + '」' + (me.p === 'TA' ? '' : '，不要用' + (me.p === '她' ? '「他」' : '「她」')) + '。' + (ch.g ? '你是' + ch.g + '生，提到你自己是「' + ch.p + '」。' : '') + '其他人按各自性别用「他/她」，不要混。';
 }
 function buildCharacterCard(char) {
     let characterCard = "你是一个住在手机里的AI助手，说话自然、简短。";
@@ -543,7 +584,7 @@ function buildCharacterCard(char) {
     } else if (char && char.name) {
         characterCard = '你叫' + char.name + '。请以这个角色的身份与我聊天，说话自然、简短，可以使用颜文字，但不要用emoji。';
     }
-    return characterCard + ((char && char.name) ? ROLE_RULES + genderRules(char) : '');
+    return characterCard + ((char && char.name) ? ROLE_RULES + liveRules() + genderRules(char) : '');
 }
 
 async function askAI(userMessage, useHistory, charId, opts) {
@@ -607,6 +648,30 @@ function appendSystemMessage(text) {
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 function currentAiAvatarHTML() { return charAvatarInner(getChar(currentChatCharId)); }
 
+// ---- 发送方式：live=发一条回一条；idle=停顿几秒后一起回；manual=我点「让TA回复」才回 ----
+const PEND = {};
+function sendMode() { const v = String(store.getItem('sendMode') || 'live'); return v === 'idle' || v === 'manual' ? v : 'live'; }
+function idleSecs() { const n = parseFloat(store.getItem('sendIdle')); return n >= 2 && n <= 60 ? n : 6; }
+async function userTriggerReply(charId, prompt, opts) {
+    const m = sendMode();
+    if (m === 'live' || isOffline(getChar(charId))) { clearTimeout((PEND[charId] || {}).t); delete PEND[charId]; return chatReply(charId, prompt, opts); }
+    const p = PEND[charId] || (PEND[charId] = { n: 0 }); p.n++; p.prompt = prompt; p.opts = opts; clearTimeout(p.t);
+    if (m === 'idle') p.t = setTimeout(() => replyPending(charId), idleSecs() * 1000);
+    refreshPend();
+}
+async function replyPending(charId) {
+    const p = PEND[charId]; if (!p || currentAbort) return;
+    clearTimeout(p.t); delete PEND[charId]; refreshPend();
+    if (!API_KEY) { uiAlert('请先在设置里填 API Key'); return; }
+    return chatReply(charId, p.prompt, Object.assign({}, p.opts || {}));
+}
+function refreshPend() {
+    let b = document.getElementById('replyNowBtn');
+    if (!b) { const sb = document.getElementById('sendBtn'); if (!sb) return; b = document.createElement('button'); b.id = 'replyNowBtn'; b.className = 'hidden'; b.onclick = () => { if (currentChatCharId) replyPending(currentChatCharId); }; sb.parentNode.insertBefore(b, sb); }
+    const p = currentChatCharId && !currentGroupId ? PEND[currentChatCharId] : null;
+    if (p && !currentAbort) { b.classList.remove('hidden'); b.textContent = sendMode() === 'idle' ? '马上回复' : '让TA回复'; b.title = '已发 ' + p.n + ' 条，TA 还没回'; } else b.classList.add('hidden');
+}
+setInterval(refreshPend, 600);
 async function sendMessage() {
     if (currentAbort) return;
     const userInput = document.getElementById('userInput');
@@ -624,7 +689,7 @@ async function sendMessage() {
     pushHistory(charId, um);
     if (el) el.dataset.idx = getHistory(charId).length - 1;
     onUserChatted(charId, text);
-    await chatReply(charId, text, q ? { quote: q } : undefined);
+    await userTriggerReply(charId, text, q ? { quote: q } : undefined);
 }
 on('offlineBtn', 'click', toggleOffline);
 on('sendBtn', 'click', () => { if (currentAbort) { currentAbort.abort(); return; } sendMessage(); });
@@ -690,7 +755,7 @@ async function sendVoiceMessage() {
     else {
         pushHistory(currentChatCharId, { role: 'user', content: '[语音消息]' + txt });
         onUserChatted(currentChatCharId, txt);
-        aiRespondTo('（我给你发了一条语音说：' + txt + '）请自然回应。', currentChatCharId);
+        userTriggerReply(currentChatCharId, '（我给你发了一条语音说：' + txt + '）请自然回应。', { silentError: true });
     }
 }
 
@@ -799,6 +864,7 @@ function stampHistory(hist) {
     let prev = 0; const wk = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
     return hist.map(m => {
         let content = String(m.content);
+        if (m.desc && m.role === 'user') content = content + '（图片内容：' + m.desc + '）';
         if (m.quote && m.role === 'user') content = '（引用' + (m.quote.w === 'me' ? '我' : '你') + '之前说的「' + m.quote.t + '」）' + content;
         if (m.ts && m.role === 'user') {
             const d = new Date(m.ts), gap = prev ? m.ts - prev : 0, newDay = prev && new Date(prev).getDate() !== d.getDate();
@@ -841,8 +907,9 @@ function flattenMidSystem(messages) {
     const out = messages.map((m, i) => (i > 0 && m.role === 'system') ? { role: 'user', content: '（系统提示）' + m.content } : m);
     return mergeSameRole(out.slice(1)).reduce((a, m) => a.concat(m), [out[0]]);
 }
+function chatTemp() { const v = parseFloat(store.getItem('chatTemp')); return v >= 0.2 && v <= 1.6 ? v : 1.0; }
 async function fetchChat(messages, stream, signal) {
-    const go = (msgs) => fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + API_KEY }, body: JSON.stringify({ model: API_MODEL, messages: msgs, stream: stream }), signal: signal });
+    const go = (msgs) => fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + API_KEY }, body: JSON.stringify({ model: API_MODEL, messages: msgs, stream: stream, temperature: chatTemp() }), signal: signal });
     let r = await go(messages);
     if (!r.ok && (r.status === 400 || r.status === 422) && messages.some((m, i) => i > 0 && m.role === 'system')) r = await go(flattenMidSystem(messages));
     return r;
@@ -958,6 +1025,7 @@ async function chatReply(charId, prompt, opts) {
         if (stream && partial.length && !ok) { finish(partial); ok = true; }
         else if (!(error && error.name === 'AbortError')) {
             bubbles.forEach(el => el.remove());
+            if (opts.visionHint) uiAlert('这次没能看图（' + (error && error.message) + '）。你的聊天模型可能不支持看图：在 聊天设置 → 识图 里改成「单独的识图接口」试试', 5200);
             if (!opts.silentError && here()) appendMessage('出错了：' + (error && error.message), 'ai-message', currentAiAvatarHTML());
         } else { bubbles.forEach(el => el.remove()); }
     } finally {
@@ -1029,6 +1097,17 @@ function renderChatMessages() {
 }
 
 // ---- 发送图片 / 表情包：保存缩略图；开启"识图"后让 AI 真的看到 ----
+// ---- 识图 ----
+function visionMode() { const v = store.getItem('visionMode'); if (v === 'off' || v === 'main' || v === 'sep') return v; return 'main'; }
+function visionCfg() { const g = (k) => String(store.getItem(k) || '').trim(); return { url: g('visionUrl') || API_URL, key: g('visionKey') || API_KEY, model: g('visionModel') || API_MODEL }; }
+async function describeImage(dataUrl) {
+    const c = visionCfg(); if (!c.key) throw new Error('还没填识图接口的 Key');
+    const body = { model: c.model, temperature: 0.3, messages: [{ role: 'user', content: [{ type: 'text', text: '请客观、具体地描述这张图片：主要内容（人物/物品/食物/场景）、颜色、画面里的文字、氛围和细节，200 字以内，不要评价，不要寒暄。' }, { type: 'image_url', image_url: { url: dataUrl } }] }] };
+    const r = await fetch(c.url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + c.key }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error('接口返回 ' + r.status + (r.status === 400 || r.status === 422 ? '（这个模型可能不支持看图）' : ''));
+    const t = String(((await r.json()).choices || [{}])[0].message.content || '').trim(); if (!t) throw new Error('没有返回内容'); return t.slice(0, 600);
+}
+function stashDesc(cid, thumb, desc) { try { const cs = getChars(), c = cs.find(x => x.id === cid); if (!c) return; for (let i = c.chatHistory.length - 1; i >= 0; i--) { const m = c.chatHistory[i]; if (m.role === 'user' && m.img === thumb) { m.desc = desc; break; } } saveChars(cs); } catch (e) {} }
 function sendImageMessage(file, kind) {
     if (!ensureChatTarget()) return;
     const isEmoji = kind === 'emoji';
@@ -1045,9 +1124,16 @@ function sendImageMessage(file, kind) {
                 pushHistory(cid, { role: 'user', content: label, img: thumb });
                 if (el) el.dataset.idx = getHistory(cid).length - 1;
                 onUserChatted(cid, '');
-                const vision = getBool('chatVision', false);
-                const what = isEmoji ? '表情包' : '图片';
-                chatReply(cid, vision ? '（我发了一张' + what + '，请看图并自然回应。）' : '（我发了一张' + what + '，你看不到具体内容，可以好奇地问问我是什么。）', { image: vision ? bigData : null, silentError: true });
+                const mode = visionMode(), what = isEmoji ? '表情包' : '图片';
+                                if (mode === 'off') userTriggerReply(cid, '（我发了一张' + what + '，你看不到具体内容，可以好奇地问问我是什么。）', { silentError: true });
+                else if (mode === 'main') userTriggerReply(cid, '（我发了一张' + what + '，请仔细看图，用你自己的口吻自然回应，说出你看到的具体内容。）', { image: bigData, visionHint: true, silentError: true });
+                else {
+                    const wait = appendMessage('正在看图…', 'ai-message', currentAiAvatarHTML());
+                    describeImage(bigData).then(desc => {
+                        if (wait) wait.remove(); stashDesc(cid, thumb, desc);
+                        userTriggerReply(cid, '（我发了一张' + what + '。你亲眼看到的画面是：「' + desc + '」。请用你自己的口吻自然回应，就像自己看到了一样，不要说“根据描述”。）', { silentError: true });
+                    }).catch(err => { if (wait) wait.remove(); uiAlert('识图失败：' + err.message + '。可以在 聊天设置 → 识图 里检查接口', 4200); userTriggerReply(cid, '（我发了一张' + what + '，但你这次没看清，可以问问我是什么。）', { silentError: true }); });
+                }
             }
         }, isEmoji ? 140 : 180);
     }, isEmoji ? 300 : 640);
@@ -1161,11 +1247,33 @@ on('memClearBtn', 'click', () => {
     saveChars(cs); document.getElementById('memText').value = ''; memFlash('已清空');
 });
 // ---- 聊天设置开关 ----
-[['chatStreamToggle', 'chatStream', true], ['chatSplitToggle', 'chatSplit', true], ['chatVisionToggle', 'chatVision', false]].forEach(a => {
+[['chatStreamToggle', 'chatStream', true], ['chatSplitToggle', 'chatSplit', true], ['chatLiveToggle', 'liveOn', true]].forEach(a => {
     const el = document.getElementById(a[0]); if (!el) return;
     el.checked = getBool(a[1], a[2]);
     el.addEventListener('change', () => { try { store.setItem(a[1], String(el.checked)); } catch (e) {} });
 });
+
+(function () {
+    const g = (i) => document.getElementById(i), sv = (k, v) => { try { store.setItem(k, v); } catch (e) {} };
+    const vm = g('visionMode'), vs = g('visionSep'), sm = g('sendModeSel'), si = g('sendIdle'), sr = g('sendIdleRow'), siv = g('sendIdleV');
+    if (vm) { vm.value = visionMode(); const u = () => { vs.style.display = vm.value === 'sep' ? '' : 'none'; }; u(); vm.onchange = () => { sv('visionMode', vm.value); u(); }; }
+    ['visionUrl', 'visionKey', 'visionModel'].forEach(k => { const el = g(k); if (el) { el.value = store.getItem(k) || ''; el.onchange = () => sv(k, el.value.trim()); } });
+    if (sm) { sm.value = sendMode(); const u = () => { sr.style.display = sm.value === 'idle' ? '' : 'none'; }; u(); sm.onchange = () => { sv('sendMode', sm.value); u(); refreshPend(); }; }
+    if (si) { si.value = idleSecs(); siv.textContent = si.value; si.oninput = () => { siv.textContent = si.value; sv('sendIdle', si.value); }; }
+})();
+(function () {
+    const t = document.getElementById('chatTempRange'), tv = document.getElementById('chatTempVal'), b = document.getElementById('liveEditBtn');
+    if (t) { t.value = chatTemp(); if (tv) tv.textContent = t.value; t.addEventListener('input', () => { if (tv) tv.textContent = t.value; try { store.setItem('chatTemp', t.value); } catch (e) {} }); }
+    if (b) b.addEventListener('click', () => {
+        const cur = String(store.getItem('liveCustom') || '').trim() || LIVE_RULES_DEFAULT.trim();
+        const m = document.createElement('div'); m.className = 'ui-dlg-mask'; m.style.zIndex = 950;
+        m.innerHTML = '<div class="ui-dlg" style="width:min(92vw,420px)"><div class="ui-dlg-msg" style="text-align:left">活人感指令：每次聊天都会发给 TA，告诉 TA 怎样像真人一样说话。可以改成你想要的风格；清空后保存＝恢复默认。</div><textarea id="liveTa" style="width:100%;height:46vh;box-sizing:border-box;border:1px solid var(--border,#ddd);border-radius:10px;padding:10px;font-size:13px;line-height:1.5;background:transparent;color:inherit"></textarea><div class="ui-dlg-btns"><button id="liveCancel">取消</button><button id="liveDef">恢复默认</button><button class="ok" id="liveOk">保存</button></div></div>';
+        document.body.appendChild(m); const ta = m.querySelector('#liveTa'); ta.value = cur;
+        m.querySelector('#liveCancel').onclick = () => m.remove();
+        m.querySelector('#liveDef').onclick = () => { try { store.setItem('liveCustom', ''); } catch (e) {} m.remove(); uiAlert('已恢复默认'); };
+        m.querySelector('#liveOk').onclick = () => { const v = ta.value.trim(); try { store.setItem('liveCustom', (!v || v === LIVE_RULES_DEFAULT.trim()) ? '' : v); } catch (e) {} m.remove(); uiAlert('已保存'); };
+    });
+})();
 
 // ---------- 12. 列表渲染 ----------
 function renderContacts() {
@@ -1569,10 +1677,10 @@ function momentVisibleTo(mode, sel) {
 function visLabel(m) {
     if (m.author !== 'user' || !m.vis) return '';
     const nm = (ids) => (ids || []).map(id => (getChar(id) || {}).name).filter(Boolean).join('、');
-    if (m.vis === 'private') return '🔒 仅自己可见';
-    if (m.vis === 'part') return '👥 部分可见：' + (nm(m.visSel) || '无');
-    if (m.vis === 'except') return '🚫 不给 ' + (nm(m.visSel) || '无') + ' 看';
-    return (m.visibleTo && m.visibleTo.length === 0) ? '🔒 没有人能看到（对方都已关闭权限）' : '';
+    if (m.vis === 'private') return '仅自己可见';
+    if (m.vis === 'part') return '部分可见：' + (nm(m.visSel) || '无');
+    if (m.vis === 'except') return '不给 ' + (nm(m.visSel) || '无') + ' 看';
+    return (m.visibleTo && m.visibleTo.length === 0) ? '没有人能看到（对方都已关闭权限）' : '';
 }
 on('postVisSeg', 'click', (e) => { const b = e.target.closest('button[data-v]'); if (!b) return; postVisMode = b.dataset.v; renderPostVisChars(); });
 on('postVisChars', 'click', (e) => { const c = e.target.closest('[data-vid]'); if (!c) return; const id = c.dataset.vid, k = postVisSel.indexOf(id); if (k >= 0) postVisSel.splice(k, 1); else postVisSel.push(id); renderPostVisChars(); });
@@ -1754,7 +1862,7 @@ async function buyProduct(name, price) {
     const detail = document.getElementById('productDetail');
     detail.innerHTML = '<div class="product-detail-desc" style="text-align:center;padding-top:100px;">正在下单...</div>';
     try {
-        const reply = await askAI("【方向：我（用户）给我自己买的，不是给你的】我买了" + name + "，花了" + price + "元，请你以角色身份给个反馈（可以夸、调侃、关心或吃醋）。直接输出即可。", true);
+        const reply = await askAI("【方向：我（用户）给我自己买的，不是给你的】我买了" + name + "，花了" + price + "元，请你以角色身份，按你自己的性格给个自然的反馈。直接输出即可。", true);
         detail.innerHTML = '<div class="product-detail-desc" style="text-align:center;padding-top:60px;"><div style="font-size:24px;">(＾▽＾)</div><p style="font-weight:600;margin:15px 0;">下单成功！</p><p style="color:var(--text-sub);font-size:12px;margin-bottom:6px;">' + escapeHtml(activeCharName()) + '</p><p>' + escapeHtml(reply) + '</p><button class="product-detail-btn" style="margin-top:20px;" onclick="backToShopping()">继续逛逛</button></div>';
     } catch (error) { detail.innerHTML = '<div style="text-align:center;padding-top:100px;">出错了：' + escapeHtml(error.message) + '</div>'; }
 }
@@ -1763,7 +1871,7 @@ async function buyGift(name, price) {
     const detail = document.getElementById('productDetail');
     detail.innerHTML = '<div class="product-detail-desc" style="text-align:center;padding-top:100px;">正在为TA下单...</div>';
     try {
-        const reply = await askAI("【方向：我（用户）买礼物送给你，你是收礼物的人】我给你买了一份礼物：" + name + "，花了" + price + "元。请你以角色身份表达收到礼物的反应（要符合性格，可以嘴硬或害羞）。直接输出即可。", true);
+        const reply = await askAI("【方向：我（用户）买礼物送给你，你是收礼物的人】我给你买了一份礼物：" + name + "，花了" + price + "元。请你以角色身份，完全按你自己的性格和习惯，自然地表达收到礼物的反应（不要套用常见的嘴硬/害羞模板，每次说法都不一样）。直接输出即可。", true);
         detail.innerHTML = '<div class="product-detail-desc" style="text-align:center;padding-top:60px;"><div style="font-size:24px;">(๑´ᵕ`๑)</div><p style="font-weight:600;margin:15px 0;">礼物已送达！</p><p style="color:var(--text-sub);font-size:12px;margin-bottom:6px;">' + escapeHtml(activeCharName()) + '</p><p>' + escapeHtml(reply) + '</p><button class="product-detail-btn" style="margin-top:20px;" onclick="backToShopping()">继续逛逛</button></div>';
     } catch (error) { detail.innerHTML = '<div style="text-align:center;padding-top:100px;">出错了：' + escapeHtml(error.message) + '</div>'; }
 }
@@ -2616,6 +2724,8 @@ function contextTail(c) {
     try { t += lifeContext(c); } catch (e) {}
     try { t += peekContext(c); } catch (e) {}
     try { const vm = visibleMomentsText(c); if (vm) t += '\n【我最近发的朋友圈（你能看到）】\n' + vm + '\n（如果自然，可以聊到；你看不到的内容不要说出来）'; } catch (e) {}
+    try { t += genderTail(c); } catch (e) {}
+    try { if (String(store.getItem('liveOn') || '1') !== '0') t += varietySeed(); } catch (e) {}
     return t;
 }
 function personaSystem(c) {
@@ -3866,14 +3976,14 @@ function renderMail() {
     box.innerHTML = m.length ? m.map(x => {
         const sealed = x.openAt && x.openAt > now;
         return '<div class="mail-card ' + (x.from === 'ta' ? 'from-ta' : 'from-me') + (sealed ? ' sealed' : '') + '"><div class="mail-head"><b>' + (x.from === 'ta' ? escapeHtml(c.name) + ' 寄来的信' : '我写的信') + '</b><span>' + fmtTs(x.ts) + '</span></div>' +
-            (sealed ? '<div class="mail-body">🔒 时间胶囊，将于 ' + new Date(x.openAt).toLocaleDateString('zh-CN') + ' 开启</div>' : '<div class="mail-body">' + escapeHtml(x.text).replace(/\n/g, '<br>') + '</div>' + (x.openAt ? '<div class="mail-tag">时间胶囊 · 已开启</div>' : '')) + '<button class="day-del" data-mdel="' + x.id + '">×</button></div>';
+            (sealed ? '<div class="mail-body">时间胶囊，将于 ' + new Date(x.openAt).toLocaleDateString('zh-CN') + ' 开启</div>' : '<div class="mail-body">' + escapeHtml(x.text).replace(/\n/g, '<br>') + '</div>' + (x.openAt ? '<div class="mail-tag">时间胶囊 · 已开启</div>' : '')) + '<button class="day-del" data-mdel="' + x.id + '">×</button></div>';
     }).join('') : '<p class="empty-tip">信箱是空的。给TA写一封信，或者让TA寄一封来～</p>';
 }
 on('mcpMailTaBtn', 'click', async () => {
     const id = getActiveCharId(); if (!id || needKey()) return; $('mcpMailTaBtn').disabled = true; uiAlert('TA 正在提笔...');
     try {
         const t = await callPersona(id, timeContext() + '\n请你以自己的口吻给我写一封信，120-220字：可以聊聊今天的心情、最近发生的小事、对我说的心里话。有称呼和落款，不要太套路。只输出信的正文。', 1.0);
-        lifeUpdate(id, l => { l.mail.push({ id: lifeId(), from: 'ta', text: String(t).trim(), ts: Date.now() }); l.mail = l.mail.slice(-80); }); bumpMood(id, 4); renderMail(); uiAlert('收到一封来信 ✉');
+        lifeUpdate(id, l => { l.mail.push({ id: lifeId(), from: 'ta', text: String(t).trim(), ts: Date.now() }); l.mail = l.mail.slice(-80); }); bumpMood(id, 4); renderMail(); uiAlert('收到一封来信 ♡');
     } catch (e) { uiAlert('出错了：' + e.message); }
     $('mcpMailTaBtn').disabled = false;
 });
@@ -3886,7 +3996,7 @@ on('mcpMailSendBtn', 'click', async () => {
     if (needKey()) return; uiAlert('信已寄出，TA 正在读...');
     try {
         const t = await callPersona(id, timeContext() + '\n我给你写了一封信：\n' + text + '\n\n请你认真回一封信（100-200字），有称呼和落款，回应信里的具体内容。只输出信的正文。', 1.0);
-        lifeUpdate(id, l => { l.mail.push({ id: lifeId(), from: 'ta', text: String(t).trim(), ts: Date.now() }); }); bumpMood(id, 6); addIntimacy(id, 3); renderMail(); uiAlert('TA 回信了 ✉');
+        lifeUpdate(id, l => { l.mail.push({ id: lifeId(), from: 'ta', text: String(t).trim(), ts: Date.now() }); }); bumpMood(id, 6); addIntimacy(id, 3); renderMail(); uiAlert('TA 回信了 ♡');
     } catch (e) { uiAlert('TA 暂时没法回信：' + e.message); }
 });
 on('mcpMailList', 'click', async (e) => { const d = e.target.closest('[data-mdel]'); if (!d) return; if (!(await uiConfirm('删除这封信吗？'))) return; lifeUpdate(getActiveCharId(), l => { l.mail = l.mail.filter(x => x.id !== d.getAttribute('data-mdel')); }); renderMail(); });
@@ -3910,8 +4020,8 @@ const NEST_PLANTS = [
     { id: 'tree', n: '小树', e: '🌳', bloom: '🌳', say: ['叶子沙沙响', '扎根中', '想长成大树'] }
 ];
 const PET_STAGES = ['蛋', '幼崽', '少年', '成年'], PLANT_STAGES = ['种子', '幼苗', '长叶', '含苞', '盛开'];
-const PET_STATS = [['food', '饱食', '🍖', 4], ['mood', '心情', '💗', 3], ['clean', '清洁', '🫧', 2], ['energy', '精力', '⚡', 2]];
-const PLANT_STATS = [['water', '水分', '💧', 5], ['sun', '阳光', '☀️', 3], ['nutri', '养分', '🍃', 1.5]];
+const PET_STATS = [['food', '饱食', '✿', 4], ['mood', '心情', '♡', 3], ['clean', '清洁', '○', 2], ['energy', '精力', 'ϟ', 2]];
+const PLANT_STATS = [['water', '水分', '◦', 5], ['sun', '阳光', '☼', 3], ['nutri', '养分', '❀', 1.5]];
 const nestLvExp = (lv) => 40 + lv * 30;
 function nestOf(c) { return lifeOf(c).nest || null; }
 function nestKind(n) { return n.kind === 'plant' ? { list: NEST_PLANTS, stats: PLANT_STATS } : { list: NEST_PETS, stats: PET_STATS }; }
@@ -4018,9 +4128,9 @@ function renderNest(talk) {
     $('nestTitle').innerHTML = escapeHtml(n.name) + ' <i>' + t.n + ' · ' + stageName + '</i>';
     $('nestLv').textContent = 'Lv.' + (n.lv || 1);
     $('nestExpFill').style.width = Math.min(100, (n.exp || 0) / nestLvExp(n.lv || 1) * 100) + '%';
-    $('nestCoins').textContent = '🪙 ' + (n.coins || 0);
+    $('nestCoins').textContent = '◎ ' + (n.coins || 0);
     $('nestStats').innerHTML = info.stats.map(s => { const v = Math.round(n.s[s[0]]); return '<div class="nest-stat"><span>' + s[2] + ' ' + s[1] + '</span><div class="mood-bar"><div class="mood-fill" style="width:' + v + '%;background:' + (v < 30 ? '#ff6b6b' : 'linear-gradient(90deg,var(--accent-soft),var(--accent2))') + '"></div></div><b>' + v + '</b></div>'; }).join('');
-    const acts = n.kind === 'plant' ? [['water', '💧', '浇水'], ['sun', '☀️', '晒太阳'], ['nutri', '🍃', '施肥'], ['talk', '💬', '说说话'], ['ta', '🫶', '叫TA来']] : [['feed', '🍖', '喂食'], ['play', '🎾', '逗玩'], ['bath', '🫧', '洗澡'], ['sleep', '🌙', '哄睡'], ['ta', '🫶', '叫TA来']];
+    const acts = n.kind === 'plant' ? [['water', '◦', '浇水'], ['sun', '☼', '晒太阳'], ['nutri', '❀', '施肥'], ['talk', '…', '说说话'], ['ta', '♡', '叫TA来']] : [['feed', '✿', '喂食'], ['play', '●', '逗玩'], ['bath', '○', '洗澡'], ['sleep', '☾', '哄睡'], ['ta', '♡', '叫TA来']];
     $('nestActs').innerHTML = acts.map(a => '<button data-act="' + a[0] + '"><span>' + a[1] + '</span>' + a[2] + '</button>').join('');
     $('nestCare').textContent = '你照顾了 ' + ((n.care || {}).me || 0) + ' 次 · ' + c.name + ' 照顾了 ' + ((n.care || {}).ta || 0) + ' 次 · 一起 ' + Math.max(1, Math.floor((Date.now() - n.born) / 864e5) + 1) + ' 天';
     $('nestLog').innerHTML = (n.log || []).slice(0, 12).map(l => '<div class="nest-log-i ' + l.who + '"><span>' + (l.who === 'ta' ? escapeHtml(c.name) : '我') + '</span>' + escapeHtml(l.text) + '<em>' + fmtTs(l.ts) + '</em></div>').join('') || '<p class="empty-tip">还没有照顾记录～</p>';
@@ -4034,10 +4144,10 @@ function nestFx(chars, n) {
 }
 function nestBounce() { const cr = $('nestCreature'); cr.classList.remove('bounce'); void cr.offsetWidth; cr.classList.add('bounce'); }
 function nestCelebrate(n, who) {
-    nestFx(['🎉', '✨', '⭐', '🎊'], 12); uiAlert('🎉 ' + n.name + ' 升到 Lv.' + n.lv + ' 了！' + (nestStage(n) !== (nestStage(Object.assign({}, n, { lv: n.lv - 1 }))) ? '\n它进化成「' + (n.kind === 'plant' ? PLANT_STAGES : PET_STAGES)[nestStage(n)] + '」啦！' : ''), 3500);
+    nestFx(['✧', '✧', '★', '✦'], 12); uiAlert('✧ ' + n.name + ' 升到 Lv.' + n.lv + ' 了！' + (nestStage(n) !== (nestStage(Object.assign({}, n, { lv: n.lv - 1 }))) ? '\n它进化成「' + (n.kind === 'plant' ? PLANT_STAGES : PET_STAGES)[nestStage(n)] + '」啦！' : ''), 3500);
 }
 function nestDo(act) {
-    const id = getActiveCharId(); let up = false, said = '', fx = ['💗'];
+    const id = getActiveCharId(); let up = false, said = '', fx = ['♡'];
     const cd = window._nestCd = window._nestCd || {}; const now = Date.now();
     if (cd[act] && now - cd[act] < 1500) return; cd[act] = now;
     const r = lifeUpdate(id, (L, c) => {
@@ -4045,9 +4155,9 @@ function nestDo(act) {
         const add = (k, v) => { n.s[k] = clamp(n.s[k] + v, 0, 100); };
         const full = (k) => n.s[k] >= 95;
         const M = {
-            feed: ['food', '🍖', '喂了' + n.name + '一顿', '好吃！', ['🍖', '😋']], bath: ['clean', '🫧', '给' + n.name + '洗了个澡', '香香的～', ['🫧', '✨']],
-            sleep: ['energy', '🌙', '哄' + n.name + '睡了一觉', '呼……zZ', ['🌙', '💤']], water: ['water', '💧', '给' + n.name + '浇了水', '咕嘟咕嘟～', ['💧']],
-            sun: ['sun', '☀️', '让' + n.name + '晒了太阳', '暖洋洋的', ['☀️', '✨']], nutri: ['nutri', '🍃', '给' + n.name + '施了肥', '感觉有力气了', ['🍃']]
+            feed: ['food', '✿', '喂了' + n.name + '一顿', '好吃！', ['✿', '♡']], bath: ['clean', '○', '给' + n.name + '洗了个澡', '香香的～', ['○', '✧']],
+            sleep: ['energy', '☾', '哄' + n.name + '睡了一觉', '呼……zZ', ['☾', 'z']], water: ['water', '◦', '给' + n.name + '浇了水', '咕嘟咕嘟～', ['◦']],
+            sun: ['sun', '☼', '让' + n.name + '晒了太阳', '暖洋洋的', ['☼', '✧']], nutri: ['nutri', '❀', '给' + n.name + '施了肥', '感觉有力气了', ['❀']]
         }[act];
         if (!M) return null;
         if (full(M[0])) { said = '已经很满啦，不用了～'; return 'full'; }
@@ -4062,22 +4172,22 @@ function bumpMoodSilent(c, d) { c.mood = clamp(((typeof c.mood === 'number') ? c
 on('nestCreature', 'click', () => {
     const id = getActiveCharId(), c = getChar(id); const n = c && nestOf(c); if (!n) return; const t = nestType(n); let up = false;
     lifeUpdate(id, (L) => { const m = L.nest; nestTick(m, Date.now()); if (m.kind === 'pet') m.s.mood = clamp(m.s.mood + 3, 0, 100); m.pokes = (m.pokes || 0) + 1; if (m.pokes % 5 === 0) { nestLog(m, 'me', '摸了摸' + m.name); up = nestGain(m, 3, 1, 'me'); } });
-    nestBounce(); nestFx(['💗', '💕'], 3); nestSay(t.say[Math.floor(Math.random() * t.say.length)]); renderNest(); if (up) nestCelebrate(nestOf(getChar(id)));
+    nestBounce(); nestFx(['♡', '♥'], 3); nestSay(t.say[Math.floor(Math.random() * t.say.length)]); renderNest(); if (up) nestCelebrate(nestOf(getChar(id)));
 });
 // 逗玩小游戏：在 7 秒内点到小球 5 次
 let _ballT = null;
 function nestPlay() {
     const sc = $('nestScene'), id = getActiveCharId(); const n = nestOf(getChar(id)); if (!n || n.kind !== 'pet') return;
     if (n.s.energy < 15) { nestSay('太累了，想先睡一觉…'); return; }
-    let ball = $('nestBall'); if (ball) ball.remove(); ball = document.createElement('div'); ball.id = 'nestBall'; ball.textContent = '🎾'; sc.appendChild(ball);
+    let ball = $('nestBall'); if (ball) ball.remove(); ball = document.createElement('div'); ball.id = 'nestBall'; ball.textContent = '●'; sc.appendChild(ball);
     let hits = 0, end = Date.now() + 8000; const place = () => { ball.style.left = (12 + Math.random() * 70) + '%'; ball.style.top = (14 + Math.random() * 40) + '%'; $('nestCreature').style.transform = 'translateX(' + ((parseFloat(ball.style.left) - 45) * 1.6) + '%)'; };
     place(); nestSay('接住球球！点 5 次～');
     const finish = (ok) => {
         clearInterval(_ballT); ball.remove(); $('nestCreature').style.transform = ''; let up = false;
         lifeUpdate(id, (L, c) => { const m = L.nest; nestTick(m, Date.now()); m.s.mood = clamp(m.s.mood + (ok ? 35 : 12), 0, 100); m.s.energy = clamp(m.s.energy - 12, 0, 100); nestLog(m, 'me', ok ? '陪' + m.name + '玩球，它玩得超开心' : '陪' + m.name + '玩了会儿球'); up = nestGain(m, ok ? 12 : 4, ok ? 8 : 2, 'me'); });
-        renderNest(ok ? '好开心！再来一次！' : '呼…有点累了'); nestFx(ok ? ['🎉', '💗', '⭐'] : ['💗'], ok ? 10 : 3); nestBounce(); if (up) nestCelebrate(nestOf(getChar(id)));
+        renderNest(ok ? '好开心！再来一次！' : '呼…有点累了'); nestFx(ok ? ['✧', '♡', '★'] : ['♡'], ok ? 10 : 3); nestBounce(); if (up) nestCelebrate(nestOf(getChar(id)));
     };
-    ball.onclick = (e) => { e.stopPropagation(); hits++; nestFx(['⭐'], 2); nestBounce(); if (hits >= 5) finish(true); else { place(); nestSay(hits + ' / 5'); } };
+    ball.onclick = (e) => { e.stopPropagation(); hits++; nestFx(['★'], 2); nestBounce(); if (hits >= 5) finish(true); else { place(); nestSay(hits + ' / 5'); } };
     _ballT = setInterval(() => { if (Date.now() > end) finish(false); }, 300);
 }
 async function nestCallTa() {
@@ -4090,7 +4200,7 @@ async function nestCallTa() {
         const t = await callPersona(id, timeContext() + '\n我们一起养的' + (n.kind === 'plant' ? '植物' : '宠物') + '叫「' + n.name + '」（' + nestType(n).n + '，Lv.' + (n.lv || 1) + '），现在状态：' + stateTxt + '（满分100）。我叫你过来一起照顾它。请你用自己的语气，先说一句你的反应并做一件最需要的照顾动作。只输出JSON：{"say":"你说的话(30字内)","act":"你做了什么(10字内)"}', 1.0);
         const j = parseJSONLoose(t) || { say: oneLine(t).slice(0, 40), act: '照顾了它' };
         lifeUpdate(id, (L) => { const m = L.nest; nestTick(m, Date.now()); m.s[low[0]] = clamp(m.s[low[0]] + 45, 0, 100); m.s[info.stats[1] ? info.stats[1][0] : low[0]] = clamp(m.s[info.stats[1] ? info.stats[1][0] : low[0]] + 8, 0, 100); nestLog(m, 'ta', String(j.act || '照顾了它') + '：「' + String(j.say || '') + '」'); up = nestGain(m, 10, 5, 'ta'); });
-        bumpMood(id, 4); addIntimacy(id, 2); renderNest(); nestFx(['🫶', '💗', '✨'], 8); nestBounce(); uiAlert(c.name + '：「' + String(j.say || '') + '」', 3500);
+        bumpMood(id, 4); addIntimacy(id, 2); renderNest(); nestFx(['♡', '♡', '✧'], 8); nestBounce(); uiAlert(c.name + '：「' + String(j.say || '') + '」', 3500);
         if (up) nestCelebrate(nestOf(getChar(id)));
     } catch (e) { uiAlert('TA 没赶过来：' + e.message); }
     if (btn) btn.disabled = false;
@@ -4100,7 +4210,7 @@ async function nestTalkPlant() {
     const id = getActiveCharId(); let up = false;
     const n0 = nestOf(getChar(id)); if (n0.talkTs && Date.now() - n0.talkTs < 60000) { nestSay('让它安静一会儿吧～'); return; }
     lifeUpdate(id, (L) => { const m = L.nest; nestTick(m, Date.now()); m.talkTs = Date.now(); nestLog(m, 'me', '对' + m.name + '说：「' + txt.slice(0, 30) + '」'); up = nestGain(m, 5, 2, 'me'); });
-    renderNest('叶子轻轻晃了晃～'); nestFx(['💗', '🍃'], 5); nestBounce(); if (up) nestCelebrate(nestOf(getChar(id)));
+    renderNest('叶子轻轻晃了晃～'); nestFx(['♡', '❀'], 5); nestBounce(); if (up) nestCelebrate(nestOf(getChar(id)));
 }
 on('nestActs', 'click', (e) => {
     const b = e.target.closest('button[data-act]'); if (!b || b.disabled) return; const a = b.dataset.act;
@@ -4113,7 +4223,7 @@ on('nestStartBtn', 'click', () => {
     const name = $('nestNameInput').value.trim(); if (!name) { uiAlert('给它起个名字吧～'); return; }
     const s = kind === 'plant' ? { water: 80, sun: 80, nutri: 80 } : { food: 80, mood: 80, clean: 80, energy: 80 };
     lifeUpdate(id, (L, c) => { L.nest = { kind: kind, type: window._nestType || list[0].id, name: name, lv: 1, exp: 0, coins: 0, born: Date.now(), ts: Date.now(), s: s, care: { me: 0, ta: 0 }, log: [] }; nestLog(L.nest, 'me', '和 ' + c.name + ' 一起迎来了「' + name + '」'); });
-    $('nestNameInput').value = ''; enterNest(); nestFx(['🎉', '✨', '💗'], 10); uiAlert('「' + name + '」来到你们身边啦！');
+    $('nestNameInput').value = ''; enterNest(); nestFx(['✧', '✧', '♡'], 10); uiAlert('「' + name + '」来到你们身边啦！');
 });
 on('nestNameAiBtn', 'click', async () => {
     const id = getActiveCharId(); if (!id || needKey()) return; $('nestNameAiBtn').disabled = true;
@@ -4143,7 +4253,7 @@ const HOME_APPS = [
     { id: 'theme', name: '主题', cls: 'theme-icon', face: '(灬╹ω╹灬)', go: () => openApp('theme') },
     { id: 'settings', name: '设置', cls: 'settings-icon', face: '(・ω・)ゞ', go: () => openApp('settings') }
 ];
-const HOME_WIDGETS = { us: '我们', weather: '天气', music: '一起听', cal: '月历', clock: '时钟', status: 'TA的状态', anni: '纪念日', pet: '小窝宠物', streak: '打卡', note: '便签', photo: '照片' };
+const HOME_WIDGETS = { us: '我们', weather: '天气', music: '一起听', cal: '月历', clock: '时钟', status: 'TA的状态', anni: '纪念日', pet: '小窝宠物', streak: '打卡', note: '便签', photo: '照片', stack: '照片堆叠' };
 // 软糯风格用的线条图标（原创，viewBox 24）
 const GLYPH = {
     chat: '<path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v6a2.5 2.5 0 0 1-2.5 2.5H11l-3.5 3v-3h0A2.5 2.5 0 0 1 5 12.5z"/><path d="M9.2 9.7h.01M12 9.7h.01M14.8 9.7h.01"/>',
@@ -4206,6 +4316,7 @@ function iconHtml(a, h, dock) {
     return '<div class="' + (dock ? 'dock-icon' : 'app-icon') + '" data-app="' + a.id + '"><div class="' + cls + '"' + style + '>' + (inner || '') + '</div><span>' + escapeHtml(nm) + '</span></div>';
 }
 function widgetHtml(w) {
+    if (w.kind === 'stack') return window.PSTACK ? window.PSTACK.html(w) : '<div class="hw hw-stack ' + (w.size || 'half') + '" data-w="' + w.id + '"></div>';
     const id = getActiveCharId(), c = id ? getChar(id) : null, d = new Date();
     let body = '', cls = 'hw hw-' + w.kind + ' ' + w.size;
     if (w.kind === 'us') {
@@ -4234,7 +4345,7 @@ function widgetHtml(w) {
         body = '<div class="hw-row"><span class="avatar-small">' + charAvatarInner(c) + '</span><div><b>' + escapeHtml(c.name) + '</b><div class="hw-sub">' + moodLabel(m) + ' · ' + Math.round(m) + '</div></div></div><div class="mood-bar" style="margin:8px 0 6px"><div class="mood-fill" style="width:' + Math.round(m) + '%"></div></div><div class="hw-sub">' + escapeHtml(act || timeSlot().hint) + '</div>';
     } else if (c && w.kind === 'anni') {
         const arr = lifeOf(c).days.map(x => ({ d: x, i: dayInfo(x) })).filter(x => x.i.diff >= 0).sort((a, b) => a.i.diff - b.i.diff);
-        if (arr.length) { const x = arr[0]; body = '<div class="hw-sub">' + escapeHtml(x.d.name) + '</div><div class="hw-big">' + (x.i.diff === 0 ? '今天' : x.i.diff) + '<small>' + (x.i.diff === 0 ? '🎉' : ' 天') + '</small></div><div class="hw-sub">' + escapeHtml(x.d.date) + '</div>'; }
+        if (arr.length) { const x = arr[0]; body = '<div class="hw-sub">' + escapeHtml(x.d.name) + '</div><div class="hw-big">' + (x.i.diff === 0 ? '今天' : x.i.diff) + '<small>' + (x.i.diff === 0 ? '✧' : ' 天') + '</small></div><div class="hw-sub">' + escapeHtml(x.d.date) + '</div>'; }
         else body = '<div class="hw-sub">纪念日</div><div class="hw-big" style="font-size:16px">还没有<br>点我去添加</div>';
     } else if (c && w.kind === 'pet') {
         const n = nestOf(c); body = n ? '<div class="hw-petemo">' + nestArt(n) + '</div><div class="hw-row2"><b>' + escapeHtml(n.name) + '</b><span>Lv.' + (n.lv || 1) + '</span></div><div class="hw-sub">' + (nestAvg(n) < 40 ? '需要照顾了～' : '状态不错') + '</div>' : '<div class="hw-petemo">' + nestEggArt0() + '</div><div class="hw-sub">去小窝领养一个</div>';
@@ -4261,13 +4372,14 @@ function renderHome() {
     dock.style.display = h.dock.length ? '' : 'none';
 }
 function folderHtml(f, h) {
-    const minis = (f.apps || []).map(appBy).filter(Boolean).slice(0, 9).map(a => { const c = h.icons[a.id] || {}; if (c.img) return '<i class="fo-mini custom-img" style="background-image:url(\'' + c.img + '\')"></i>'; return '<i class="fo-mini ' + (homeStyleOf('icon') === 'color' ? a.cls : 'fo-plain') + '">' + (homeStyleOf('icon') === 'color' ? '' : glyphSvg(a.id)) + '</i>'; }).join('');
+    const minis = (f.apps || []).map(appBy).filter(Boolean).slice(0, 9).map(a => { const c = h.icons[a.id] || {}; if (c.img) return '<i class="fo-mini custom-img" style="background-image:url(\'' + c.img + '\')"></i>'; const col = homeStyleOf('icon') === 'color'; return '<i class="fo-mini ' + (col ? a.cls : 'fo-plain') + '">' + (col ? '' : glyphSvg(a.id)) + '</i>'; }).join('');
     return '<div class="app-icon" data-fo="' + f.id + '"><div class="icon-bg fo-bg"><div class="fo-g">' + minis + '</div></div><span>' + escapeHtml(f.name || '文件夹') + '</span></div>';
 }
 function homeClick(e) {
     const fo = e.target.closest('[data-fo]'); if (fo) { if (window.HOMEFOLDER) HOMEFOLDER.open(fo.dataset.fo); return; }
     const ap = e.target.closest('[data-app]'); if (ap) { const a = appBy(ap.dataset.app); if (a) a.go(); return; }
     const w = e.target.closest('[data-w]'); if (!w) return; const h = getHome(), it = h.items.find(x => x.id === w.dataset.w); if (!it) return;
+    if (it.kind === 'stack') { if (window.PSTACK) window.PSTACK.click(it, e); return; }
     if (it.kind === 'us') { const id = getActiveCharId(), c = id ? getChar(id) : null; if (!c) { openApp('chat'); return; } const L0 = lifeOf(c); if (L0.days.some(d => /在一起/.test(d.name))) { openApp('mcp'); setMcpTab('days'); } else uiPrompt('你们在一起的日子（格式 2025-02-14）：', '').then(v => { if (v === null) return; v = v.trim(); if (!/^\d{4}-\d{1,2}-\d{1,2}$/.test(v)) { uiAlert('格式不对，像 2025-02-14 这样写'); return; } const p = v.split('-'); lifeUpdate(id, l => { l.days.push({ id: lifeId(), name: '在一起', date: p[0] + '-' + pad2(+p[1]) + '-' + pad2(+p[2]), yearly: false }); }); renderHome(); }); return; }
     if (it.kind === 'music') { openApp('mcp'); setMcpTab('together'); return; }
     if (it.kind === 'status') openApp('mcp'); else if (it.kind === 'anni') { openApp('mcp'); setMcpTab('days'); } else if (it.kind === 'streak') { openApp('mcp'); setMcpTab('care'); }
@@ -4299,7 +4411,7 @@ function renderHomeEdit() {
         if (it.t === 'w') { name = '▦ ' + HOME_WIDGETS[it.kind]; prev = '<span class="he-prev he-w">▦</span>'; }
         else { const a = appBy(it.id); if (!a) return ''; const c = h.icons[a.id] || {}; name = c.name || a.name; prev = '<span class="he-prev ' + (c.img ? 'custom-img' : a.cls) + '"' + (c.img ? ' style="background-image:url(\'' + c.img + '\')"' : '') + '>' + (c.img ? '' : escapeHtml(c.text || a.face)) + '</span>'; }
         const ctl = it.t === 'w'
-            ? '<button data-he="size" data-i="' + i + '">' + ({ s: '小', half: '中', wide: '大' }[it.size] || '中') + '</button>' + (it.kind === 'photo' ? '<button data-he="photo" data-i="' + i + '">选图</button>' : '') + (it.kind === 'note' ? '<button data-he="note" data-i="' + i + '">编辑</button>' : '') + '<button data-he="del" data-i="' + i + '">删除</button>'
+            ? '<button data-he="size" data-i="' + i + '">' + ({ s: '小', half: '中', wide: '大' }[it.size] || '中') + '</button>' + (it.kind === 'photo' ? '<button data-he="photo" data-i="' + i + '">选图</button>' : '') + (it.kind === 'stack' ? '<button data-he="stack" data-i="' + i + '">设计</button>' : '') + (it.kind === 'note' ? '<button data-he="note" data-i="' + i + '">编辑</button>' : '') + '<button data-he="del" data-i="' + i + '">删除</button>'
             : '<button data-he="icon" data-i="' + i + '">改图标</button><button data-he="dock" data-i="' + i + '" class="' + (h.dock.indexOf(it.id) >= 0 ? 'on' : '') + '">Dock</button><button data-he="vis" data-i="' + i + '" class="' + (h.hidden.indexOf(it.id) >= 0 ? '' : 'on') + '">' + (h.hidden.indexOf(it.id) >= 0 ? '已隐藏' : '显示') + '</button>';
         return '<div class="he-row">' + prev + '<div class="he-name">' + escapeHtml(name) + '</div><div class="he-ctl">' + ctl + '<button data-he="up" data-i="' + i + '">↑</button><button data-he="down" data-i="' + i + '">↓</button></div></div>';
     }).join('');
@@ -4317,6 +4429,7 @@ on('homeEditList', 'click', async (e) => {
     else if (act === 'photo') { homePickImage((d) => { it.data.img = d; saveHome(h); renderHomeEdit(); renderHome(); }, 400); return; }
     else if (act === 'note') { const v = await uiPrompt('便签内容：', it.data.text || ''); if (v === null) return; it.data.text = v; }
     else if (act === 'icon') { openIconEdit(it.id); return; }
+    else if (act === 'stack') { if (window.PSTACK) window.PSTACK.edit(it.id); return; }
     saveHome(h); renderHomeEdit(); renderHome();
 });
 on('homeAddWidgets', 'click', (e) => { const b = e.target.closest('[data-addw]'); if (!b) return; const h = getHome(), k = b.dataset.addw; h.items.unshift({ t: 'w', id: 'w_' + k + Date.now().toString(36), kind: k, size: (k === 'clock' || k === 'photo' || k === 'cal') ? 'wide' : 'half', data: {} }); saveHome(h); renderHomeEdit(); renderHome(); uiAlert('已添加到桌面最前面，可以用 ↑↓ 调整位置'); });
@@ -4455,7 +4568,7 @@ function sendSticker(st) {
     const label = '[表情包:' + st.name + ']', msg = { role: 'user', content: label }; if (st.face) msg.face = st.face; else msg.img = st.data;
     const el = appendCardMessage('user-message', stickerBubbleHtml(st), true);
     if (currentGroupId) { pushGroupHistory(currentGroupId, msg); if (el) el.dataset.idx = (getGroup(currentGroupId).chatHistory || []).length - 1; groupReply(currentGroupId, null); }
-    else { const cid = currentChatCharId; const b = getChar(cid); if (b && b.blocked) { if (el) el.remove(); uiAlert('TA 在你的黑名单里，先移出黑名单才能聊天哦'); return; } pushHistory(cid, msg); if (el) el.dataset.idx = getHistory(cid).length - 1; onUserChatted(cid, ''); chatReply(cid, '（我发了一个表情包「' + st.name + '」，请按它的意思自然回应。）', { silentError: true }); }
+    else { const cid = currentChatCharId; const b = getChar(cid); if (b && b.blocked) { if (el) el.remove(); uiAlert('TA 在你的黑名单里，先移出黑名单才能聊天哦'); return; } pushHistory(cid, msg); if (el) el.dataset.idx = getHistory(cid).length - 1; onUserChatted(cid, ''); userTriggerReply(cid, '（我发了一个表情包「' + st.name + '」，请按它的意思自然回应。）', { silentError: true }); }
 }
 
 try { renderPostVisChars(); } catch (e) {}
@@ -4487,10 +4600,32 @@ function usageStats() {
     if (_sess) cur = (now - _sess[0]) / 60000;
     return { totalMin: Math.round(total), hours: hours, opens: opens, latestNight: latestNight, curMin: Math.round(cur) };
 }
-// 电量
+// 电量：安卓/电脑浏览器能直接读；iOS 的 Safari 不给网页读电量，所以提供「手动填写」和「快捷指令同步」两种办法
 let _bat = null;
-if (navigator.getBattery) navigator.getBattery().then(b => { _bat = b; ['levelchange', 'chargingchange'].forEach(ev => b.addEventListener(ev, () => { try { if (typeof renderPeek === 'function' && mcpTab === 'peek') renderPeek(); } catch (e) {} })); }).catch(() => {});
-function batteryNow() { return _bat ? { level: Math.round(_bat.level * 100), charging: !!_bat.charging } : null; }
+const BAT_STALE = 8 * 36e5;
+function batManual() { try { const o = JSON.parse(store.getItem('batManual') || 'null'); return o && typeof o.level === 'number' ? o : null; } catch (e) { return null; } }
+function batSave(level, charging, src) { level = Math.max(1, Math.min(100, Math.round(+level) || 0)); if (!level) return; try { store.setItem('batManual', JSON.stringify({ level: level, charging: !!charging, ts: Date.now(), src: src || 'manual' })); } catch (e) {} try { document.dispatchEvent(new Event('batterychange')); } catch (e) {} }
+// 快捷指令 / 链接带参数打开：?bat=86&chg=1
+(function () { try { const u = new URL(location.href), b = u.searchParams.get('bat'); if (b != null && b !== '') { const ch = u.searchParams.get('chg'); batSave(parseFloat(b), ch === '1' || ch === 'true', 'link'); u.searchParams.delete('bat'); u.searchParams.delete('chg'); history.replaceState(null, '', u.pathname + (u.search || '') + u.hash); } } catch (e) {} })();
+if (navigator.getBattery) navigator.getBattery().then(b => { _bat = b; ['levelchange', 'chargingchange'].forEach(ev => b.addEventListener(ev, () => { try { document.dispatchEvent(new Event('batterychange')); if (typeof renderPeek === 'function' && mcpTab === 'peek') renderPeek(); } catch (e) {} })); try { document.dispatchEvent(new Event('batterychange')); } catch (e) {} }).catch(() => {});
+function batteryNow() {
+    if (_bat) return { level: Math.round(_bat.level * 100), charging: !!_bat.charging, src: 'auto' };
+    const m = batManual(); if (!m) return null;
+    return { level: m.level, charging: !!m.charging, src: m.src || 'manual', stale: Date.now() - (m.ts || 0) > BAT_STALE };
+}
+function batPanelHtml() {
+    const b = batteryNow(), auto = !!_bat, m = batManual(), url = location.origin + location.pathname;
+    let h = '<div class="pk-card"><div class="pk-cap">电量来源</div>';
+    if (auto) h += '<div class="pk-sub">已自动读取到这台设备的电量：' + b.level + '%' + (b.charging ? '（充电中）' : '') + '</div>';
+    else {
+        h += '<div class="pk-sub">' + (m ? '当前使用：' + (m.src === 'link' ? '快捷指令同步' : '手动填写') + ' ' + m.level + '%' + (m.charging ? '（充电中）' : '') + '，' + agoText(m.ts) + (b && b.stale ? '（很久没更新了，TA 会当作不确定）' : '') : 'iPhone 的 Safari 不允许网页读取电量，可以用下面两种办法让 TA 知道。') + '</div>'
+            + '<div class="pk-permrow"><span>手动填电量 <b id="batV">' + (m ? m.level : 80) + '</b>%</span><input type="range" id="batRange" min="1" max="100" value="' + (m ? m.level : 80) + '" style="width:45%"></div>'
+            + '<div class="pk-permrow"><span>正在充电</span><input type="checkbox" class="ios-switch" id="batChg"' + (m && m.charging ? ' checked' : '') + '></div>'
+            + '<button class="btn-primary" id="batSave" style="margin-top:6px">保存电量</button>'
+            + '<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--text-sub);font-size:13px">自动同步（iOS 快捷指令，设置一次就行）</summary><div class="hint-line" style="line-height:1.8">1. 打开「快捷指令」→ 自动化 →「电量」（例如：电量 20% 或 充电时）/「时间」每小时。<br>2. 动作选「获取电池电量」，再加「打开 URL」，链接填：<br><code id="batUrl" style="word-break:break-all;user-select:all">' + escapeHtml(url) + '?bat=【电池电量】&amp;chg=1</code><br>把【电池电量】换成上一步的变量（长按选「电池电量」）；不在充电就把 chg=1 改成 chg=0。<br>3. 每次自动化运行，小手机会记下电量，TA 就能看到。</div></details>';
+    }
+    return h + '</div>';
+}
 function netNow() {
     const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection || {};
     const map = { 'slow-2g': '2G', '2g': '2G', '3g': '3G', '4g': '4G/5G' };
@@ -4504,7 +4639,7 @@ function peekMaster() { return peekConsented() && store.getItem('peekMaster') !=
 function peekMode() { return store.getItem('peekMode') === 'ask' ? 'ask' : 'free'; }
 function peekGranted() { return Number(store.getItem('peekGrantUntil') || 0) > Date.now(); }
 // 天气（Open-Meteo，免费无需 Key）
-function wxInfo(code) { return WX_CODE[code] || ['多云', '⛅']; }
+function wxInfo(code) { return WX_CODE[code] || ['多云', '☁']; }
 function getWeather() { try { return JSON.parse(store.getItem('weatherCache') || 'null'); } catch (e) { return null; } }
 // 常用城市坐标（接口搜不到时的兜底，也能省一次请求）
 const CN_CITY = {北京:[39.90,116.41],上海:[31.23,121.47],天津:[39.13,117.20],重庆:[29.56,106.55],广州:[23.13,113.26],深圳:[22.54,114.06],杭州:[30.27,120.16],南京:[32.06,118.80],苏州:[31.30,120.58],无锡:[31.49,120.31],常州:[31.81,119.97],南通:[31.98,120.89],徐州:[34.26,117.19],连云港:[34.60,119.22],淮安:[33.61,119.02],盐城:[33.35,120.16],扬州:[32.39,119.41],镇江:[32.19,119.43],泰州:[32.46,119.92],宿迁:[33.96,118.28],成都:[30.57,104.07],武汉:[30.59,114.31],西安:[34.34,108.94],长沙:[28.23,112.94],郑州:[34.75,113.63],济南:[36.65,117.12],青岛:[36.07,120.38],烟台:[37.46,121.45],潍坊:[36.71,119.16],临沂:[35.10,118.36],济宁:[35.41,116.59],日照:[35.42,119.53],枣庄:[34.81,117.32],菏泽:[35.23,115.48],沈阳:[41.80,123.43],大连:[38.91,121.61],哈尔滨:[45.80,126.53],长春:[43.82,125.32],石家庄:[38.04,114.51],太原:[37.87,112.55],呼和浩特:[40.84,111.75],合肥:[31.82,117.23],芜湖:[31.35,118.43],蚌埠:[32.92,117.39],福州:[26.07,119.30],厦门:[24.48,118.09],泉州:[24.87,118.68],南昌:[28.68,115.86],宁波:[29.87,121.54],温州:[28.00,120.70],嘉兴:[30.75,120.76],绍兴:[30.00,120.58],金华:[29.08,119.65],台州:[28.66,121.42],海口:[20.04,110.20],三亚:[18.25,109.51],南宁:[22.82,108.32],桂林:[25.27,110.29],昆明:[25.04,102.71],贵阳:[26.65,106.63],拉萨:[29.65,91.14],兰州:[36.06,103.83],西宁:[36.62,101.78],银川:[38.49,106.23],乌鲁木齐:[43.83,87.62],洛阳:[34.62,112.45],开封:[34.80,114.31],佛山:[23.02,113.12],东莞:[23.02,113.75],珠海:[22.27,113.58],惠州:[23.11,114.42],中山:[22.52,113.39],汕头:[23.35,116.68],湛江:[21.27,110.36],唐山:[39.63,118.18],保定:[38.87,115.46],邯郸:[36.61,114.54],秦皇岛:[39.94,119.60],大同:[40.08,113.30],襄阳:[32.01,112.12],宜昌:[30.69,111.29],岳阳:[29.36,113.13],衡阳:[26.89,112.57],赣州:[25.83,114.93],香港:[22.32,114.17],澳门:[22.20,113.54],台北:[25.03,121.57]};
@@ -4593,7 +4728,7 @@ function peekState(c) { const L = lifeOf(c); L.peek = L.peek || { log: [], nextA
 function peekRecord(charId, entry) { lifeUpdate(charId, (L) => { L.peek = L.peek || { log: [], nextAt: 0, day: { d: '', n: 0 }, ev: {} }; L.peek.log.unshift(entry); L.peek.log = L.peek.log.slice(0, 40); }); }
 function peekBanner(c, saw, say, charId) {
     let b = $('peekBanner'); if (!b) { b = document.createElement('div'); b.id = 'peekBanner'; b.className = 'peek-banner'; $('desktop').parentNode.appendChild(b); }
-    b.innerHTML = '<span class="pb-ic">🔍</span><div><b>' + escapeHtml(c.name) + ' 翻看了你的手机</b><i>' + escapeHtml((saw || []).slice(0, 3).join(' · ')) + '</i><p>' + escapeHtml(say) + '</p></div>';
+    b.innerHTML = '<span class="pb-ic">⌕</span><div><b>' + escapeHtml(c.name) + ' 翻看了你的手机</b><i>' + escapeHtml((saw || []).slice(0, 3).join(' · ')) + '</i><p>' + escapeHtml(say) + '</p></div>';
     b.onclick = () => { b.classList.remove('show'); openChatWith(charId); };
     b.classList.add('show'); clearTimeout(b._t); b._t = setTimeout(() => b.classList.remove('show'), 6000);
 }
@@ -4664,18 +4799,19 @@ function renderPeek() {
     const box = $('mcpPeekBody'); if (!box) return; const id = getActiveCharId(), c = id ? getChar(id) : null;
     if (!c) { box.innerHTML = '<p class="empty-tip">先创建角色吧~</p>'; return; }
     if (!peekConsented()) {
-        box.innerHTML = '<div class="pk-consent"><div class="pk-big">🔍</div><h3>让 TA 看看你的手机？</h3><p>开启后，TA 会自己不定时翻看你<b>真实的设备状态</b>（不是你每次叫 TA 才看）：电量、网络、你用这个小手机的时长和时段，还有你所在城市的天气，然后在聊天里自然地关心你。</p><p class="pk-note">TA 只能看到你在下面打开的项目；看不到你手机上的其他 App、相册、短信和通知。数据只保存在你自己的浏览器里，只有在 TA 回复你的时候，才会把相关摘要发给你填的 AI 接口。</p><button class="btn-primary" id="pkConsentBtn">同意并开启</button></div>'; return;
+        box.innerHTML = '<div class="pk-consent"><div class="pk-big">⌕</div><h3>让 TA 看看你的手机？</h3><p>开启后，TA 会自己不定时翻看你<b>真实的设备状态</b>（不是你每次叫 TA 才看）：电量、网络、你用这个小手机的时长和时段，还有你所在城市的天气，然后在聊天里自然地关心你。</p><p class="pk-note">TA 只能看到你在下面打开的项目；看不到你手机上的其他 App、相册、短信和通知。数据只保存在你自己的浏览器里，只有在 TA 回复你的时候，才会把相关摘要发给你填的 AI 接口。</p><button class="btn-primary" id="pkConsentBtn">同意并开启</button></div>'; return;
     }
     const p = peekPerm(), S = peekSnapshot(true), L = lifeOf(c), ps = peekState(c), master = peekMaster(), fr = store.getItem('peekFreq') || 'mid';
     const bat = S.battery, net = S.net, u = S.usage, w = getWeather(); const maxH = Math.max(10, ...u.hours);
     let html = '<div class="pk-phone">';
     html += '<div class="pk-row2">';
-    html += '<div class="pk-card">' + (bat ? ringSvg(bat.level, bat.level <= 20 ? '#ff453a' : (bat.charging ? '#34c759' : '#ff8fab'), bat.level + '%', bat.charging ? '⚡ 充电中' : '电量') : '<div class="pk-na">电量<br><small>这个浏览器读不到<br>（iPhone Safari 不支持）</small></div>') + '</div>';
-    html += '<div class="pk-card pk-net"><div class="pk-cap">网络</div><div class="pk-val">' + (net.online ? (net.type === 'wifi' ? '📶 Wi-Fi' : net.type === 'cellular' ? '📱 移动数据' : '🌐 在线') : '✈️ 已断网') + '</div><div class="pk-sub">' + (net.eff ? '速度档位 ' + net.eff : '') + (net.downlink ? ' · ' + net.downlink + 'Mbps' : '') + '</div><div class="pk-cap" style="margin-top:8px">设备</div><div class="pk-sub">' + escapeHtml((navigator.platform || '') + ' · ' + screen.width + '×' + screen.height) + '</div></div>';
+    html += '<div class="pk-card">' + (bat ? ringSvg(bat.level, bat.level <= 20 ? '#ff453a' : (bat.charging ? '#34c759' : '#ff8fab'), bat.level + '%', bat.charging ? 'ϟ 充电中' : '电量') : '<div class="pk-na">电量<br><small>这个浏览器读不到<br>（iPhone Safari 不支持）</small></div>') + '</div>';
+    html += '<div class="pk-card pk-net"><div class="pk-cap">网络</div><div class="pk-val">' + (net.online ? (net.type === 'wifi' ? 'Wi-Fi' : net.type === 'cellular' ? '移动数据' : '在线') : '已断网') + '</div><div class="pk-sub">' + (net.eff ? '速度档位 ' + net.eff : '') + (net.downlink ? ' · ' + net.downlink + 'Mbps' : '') + '</div><div class="pk-cap" style="margin-top:8px">设备</div><div class="pk-sub">' + escapeHtml((navigator.platform || '') + ' · ' + screen.width + '×' + screen.height) + '</div></div>';
     html += '</div>';
-    html += '<div class="pk-card"><div class="pk-cap">今日使用（本小手机）</div><div class="pk-val">' + fmtMin(u.totalMin) + '<small> · 打开 ' + u.opens + ' 次</small></div><div class="pk-bars">' + u.hours.map((m, h) => '<i style="height:' + Math.max(3, Math.round(m / maxH * 100)) + '%" class="' + (h === new Date().getHours() ? 'now' : '') + (m > 0 ? ' on' : '') + '"></i>').join('') + '</div><div class="pk-axis"><span>0</span><span>6</span><span>12</span><span>18</span><span>24</span></div>' + (u.latestNight ? '<div class="pk-chip">🌙 最晚在线 ' + pad2(new Date(u.latestNight).getHours()) + ':' + pad2(new Date(u.latestNight).getMinutes()) + '</div>' : '') + '</div>';
+    html += '<div class="pk-card"><div class="pk-cap">今日使用（本小手机）</div><div class="pk-val">' + fmtMin(u.totalMin) + '<small> · 打开 ' + u.opens + ' 次</small></div><div class="pk-bars">' + u.hours.map((m, h) => '<i style="height:' + Math.max(3, Math.round(m / maxH * 100)) + '%" class="' + (h === new Date().getHours() ? 'now' : '') + (m > 0 ? ' on' : '') + '"></i>').join('') + '</div><div class="pk-axis"><span>0</span><span>6</span><span>12</span><span>18</span><span>24</span></div>' + (u.latestNight ? '<div class="pk-chip">☾ 最晚在线 ' + pad2(new Date(u.latestNight).getHours()) + ':' + pad2(new Date(u.latestNight).getMinutes()) + '</div>' : '') + '</div>';
     html += '<div class="pk-card pk-wx"><div class="pk-cap">所在城市天气</div>' + (w && w.city === (store.getItem('userCity') || '').trim() ? '<div class="pk-wxrow"><span class="pk-wxi">' + wxInfo(w.code)[1] + '</span><div><div class="pk-val">' + w.temp + '°<small> ' + wxInfo(w.code)[0] + '</small></div><div class="pk-sub">' + escapeHtml(w.name) + ' · ' + w.min + '~' + w.max + '°' + (w.rain != null ? ' · 降水' + w.rain + '%' : '') + '</div></div></div>' : '<div class="pk-sub">填写城市后，TA 就知道你那边的天气</div>') + '<div class="pk-cityrow"><input id="pkCity" class="input-text" placeholder="你所在的城市，如：上海" value="' + escapeHtml(store.getItem('userCity') || '') + '"><button id="pkCityBtn" class="btn-small">保存</button></div></div>';
     html += '</div>';
+    html += batPanelHtml();
     html += '<p class="section-title">TA 能看什么</p><div class="pk-perm"><div class="pk-permrow master"><span>允许 ' + escapeHtml(c.name) + ' 自己来查岗</span><input type="checkbox" class="ios-switch" id="pkMaster" ' + (master && c.peekOn !== false ? 'checked' : '') + '></div>' + PEEK_ITEMS.map(i => '<div class="pk-permrow"><span>' + i[1] + '</span><input type="checkbox" class="ios-switch" data-pp="' + i[0] + '" ' + (p[i[0]] ? 'checked' : '') + '></div>').join('') + '<div class="pk-permrow"><span>查岗频率</span><div class="seg pk-seg" id="pkFreq"><button data-f="low" class="' + (fr === 'low' ? 'on' : '') + '">偶尔</button><button data-f="mid" class="' + (fr === 'mid' ? 'on' : '') + '">常常</button><button data-f="high" class="' + (fr === 'high' ? 'on' : '') + '">盯紧点</button></div></div></div>';
     html += '<p class="section-title">查岗方式</p><div class="pk-mode"><button data-pm="free" class="' + (peekMode() === 'free' ? 'on' : '') + '">随时可查</button><button data-pm="ask" class="' + (peekMode() === 'ask' ? 'on' : '') + '">每次要我同意</button></div><p class="hint-line">' + (peekMode() === 'free' ? '你已经同意 TA 随时查：TA 会按下面的频率自己翻看，不会再问你。' : 'TA 想看的时候会先弹窗问你，你可以同意或不同意；同意后 30 分钟内 TA 都能看到，不同意 TA 会有反应。') + '</p>';
     html += '<button class="btn-primary" id="pkNowBtn" style="margin-top:10px;">让 TA 现在就看一眼</button><p class="hint-line">页面开着时，TA 会按频率自己翻看，电量低、凌晨还在玩、连续玩太久时也会主动来管你。页面关掉后不会查（网页没法在后台运行）。</p>';
@@ -4687,9 +4823,11 @@ on('mcpPeekBody', 'click', async (e) => {
     if (e.target.id === 'pkConsentBtn') { store.setItem('peekConsent', '1'); store.setItem('peekMaster', '1'); if (id) lifeUpdate(id, (L, c) => { c.peekOn = true; }); renderPeek(); fetchWeather(true).then(() => renderPeek()); setTimeout(peekTick, 2000); return; }
     if (e.target.id === 'pkCityBtn') { store.setItem('userCity', ($('pkCity').value || '').trim()); store.removeItem('weatherCache'); uiAlert('正在查询天气…'); const w = await fetchWeather(true); renderPeek(); renderHome(); uiAlert(w ? '已更新：' + weatherLine(w) : (_wxErr || '没查到天气，检查一下城市名或网络')); return; }
     if (e.target.id === 'pkNowBtn') { if (needKey()) return; e.target.disabled = true; e.target.textContent = 'TA 正在翻你的手机…'; await fetchWeather(false); const ok = await doPeek(id, '你让我现在看一眼', null, { granted: true }); uiAlert(ok ? '看完啦，TA 已经给你发消息了' : '这次没看到什么（可能所有项目都被关了）'); renderPeek(); return; }
+    if (e.target.id === 'batSave') { batSave($('batRange').value, $('batChg').checked, 'manual'); uiAlert('电量已保存', 1200); renderPeek(); return; }
     const pm = e.target.closest('[data-pm]'); if (pm) { store.setItem('peekMode', pm.dataset.pm); renderPeek(); return; }
     const f = e.target.closest('[data-f]'); if (f) { store.setItem('peekFreq', f.dataset.f); renderPeek(); }
 });
+on('mcpPeekBody', 'input', (e) => { if (e.target.id === 'batRange') { const v = $('batV'); if (v) v.textContent = e.target.value; } });
 on('mcpPeekBody', 'change', (e) => {
     const t = e.target, id = getActiveCharId();
     if (t.id === 'pkMaster') { lifeUpdate(id, (L, c) => { c.peekOn = t.checked; }); if (t.checked) store.setItem('peekMaster', '1'); renderPeek(); return; }

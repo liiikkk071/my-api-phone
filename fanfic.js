@@ -2,7 +2,7 @@
 (function () {
     'use strict';
     const $ = (id) => document.getElementById(id), esc = (s) => escapeHtml(String(s == null ? '' : s));
-    const FORM = 'fanficForm', LIB = 'fanficLib';
+    const FORM = 'fanficForm', LIB = 'fanficLib', HIST = 'fanficHist';
     const uid = () => 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 
     // ---------- 选项库 ----------
@@ -67,10 +67,37 @@
     function ensure() {
         if ($('fanficApp')) return;
         const el = document.createElement('div'); el.id = 'fanficApp'; el.className = 'app-screen hidden'; el.style.position = 'absolute';
-        el.innerHTML = '<div class="app-header"><button onclick="goHome()">‹ 返回</button><span>同人文</span><button class="hdr-btn" id="ffSwitch">作品库</button></div><div class="scroll-area xa-body" id="ffBody"></div><div class="ff-bar" id="ffBar"></div>';
+        el.innerHTML = '<div class="app-header"><button id="ffHdrBack">‹ 返回</button><span>同人文</span><button class="hdr-btn" id="ffSwitch">作品库</button></div><div class="scroll-area xa-body" id="ffBody"></div><div class="ff-bar" id="ffBar"></div>';
         ($('callScreen') ? $('callScreen').parentElement : document.body).appendChild(el);
-        $('ffSwitch').onclick = () => { view = view === 'lib' ? 'make' : 'lib'; if (view === 'lib') cur = null; render(); };
+        $('ffHdrBack').onclick = () => { if (cur) { cur = null; view = 'make'; render(); } else if (view !== 'make') { view = 'make'; render(); } else goHome(); };
+        $('ffSwitch').onclick = () => { view = view === 'make' ? 'hist' : 'make'; if (view !== 'make') cur = null; render(); };
         new MutationObserver(() => { if (!el.classList.contains('hidden')) render(); }).observe(el, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    // ---------- 生成记录（每次生成 / 续写 / 改写都会自动记下来，不用手动收藏也不会丢） ----------
+    const HIST_MAX = 60;
+    function histStrip(o) { return { id: o.id, title: o.title, text: o.text, charId: o.charId, charName: o.charName, ts: o.ts, upd: Date.now(), saved: !!o.saved, chapters: o.chapters, spec: o.spec, sys: o.sys }; }
+    function pushHist(o) { if (!o || !o.text) return; const list = jget(HIST, []).filter(x => x.id !== o.id); list.unshift(histStrip(o)); jset(HIST, list.slice(0, HIST_MAX)); }
+    function tabsHtml() {
+        const t = view === 'lib' ? 'lib' : view === 'hist' ? 'hist' : 'make';
+        return '<div class="ff-tabs"><button data-tab="make" class="' + (t === 'make' ? 'on' : '') + '">创作</button><button data-tab="hist" class="' + (t === 'hist' ? 'on' : '') + '">生成记录 ' + (jget(HIST, []).length || '') + '</button><button data-tab="lib" class="' + (t === 'lib' ? 'on' : '') + '">收藏</button></div>';
+    }
+    function bindTabs(body) { body.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { const v = b.dataset.tab; if (v === view && !cur) return; view = v; if (v !== 'make') cur = null; render(); }); }
+    function ago(ts) { const d = new Date(ts), n = new Date(), p = (x) => String(x).padStart(2, '0'); return (d.toDateString() === n.toDateString() ? '今天 ' : (d.getMonth() + 1) + '月' + d.getDate() + '日 ') + p(d.getHours()) + ':' + p(d.getMinutes()); }
+    function renderHist(body, bar) {
+        bar.innerHTML = ''; const list = jget(HIST, []), lib = jget(LIB, []);
+        let h = tabsHtml();
+        if (!list.length) h += '<div class="xa-empty">还没有生成记录<br>每次生成、续写、改写的同人文都会自动记在这里</div>';
+        else h += '<p class="ff-hint">最近 ' + list.length + ' 篇（最多保留 ' + HIST_MAX + ' 篇）。点开可以继续看、续写、修改。</p>' + list.map(o => '<div class="ff-lib" data-id="' + o.id + '"><div class="l"><b>《' + esc(o.title) + '》' + (lib.some(z => z.id === o.id) ? '<i class="ff-fav">已收藏</i>' : '') + '</b><span>' + esc(o.charName) + ' · ' + wc(o.text) + ' 字' + (o.chapters > 1 ? ' · ' + o.chapters + ' 章' : '') + ' · ' + ago(o.upd || o.ts) + '</span><em>' + esc(String(o.text).replace(/\s+/g, ' ').slice(0, 46)) + '…</em></div><button class="hdr-btn" data-del="' + o.id + '">删除</button></div>').join('') + '<div class="xa-btns"><button class="dan" id="ffHistClr">清空生成记录</button></div>';
+        body.innerHTML = h; bindTabs(body);
+        const clr = $('ffHistClr'); if (clr) clr.onclick = async () => { if (!(await uiConfirm('清空所有生成记录吗？（已收藏的作品不受影响）'))) return; jset(HIST, []); render(); };
+        body.onclick = async (e) => {
+            if (e.target.closest('[data-tab]') || e.target.closest('#ffHistClr')) return;
+            const d = e.target.closest('[data-del]');
+            if (d) { if (!(await uiConfirm('删除这条记录吗？'))) return; jset(HIST, jget(HIST, []).filter(x => x.id !== d.dataset.del)); render(); return; }
+            const r = e.target.closest('.ff-lib'); if (!r) return; const o = jget(HIST, []).find(x => x.id === r.dataset.id); if (!o) return;
+            cur = Object.assign({}, o, { saved: jget(LIB, []).some(z => z.id === o.id) }); view = 'make'; render();
+        };
     }
 
     // ---------- 渲染 ----------
@@ -95,10 +122,11 @@
     }
     function render() {
         const body = $('ffBody'), bar = $('ffBar'); if (!body) return;
-        $('ffSwitch').textContent = view === 'lib' ? '去创作' : '作品库';
+        $('ffSwitch').textContent = view === 'make' ? '生成记录' : '去创作';
         if (view === 'lib') return renderLib(body, bar);
+        if (view === 'hist') return renderHist(body, bar);
         if (cur) return renderOut(body, bar);
-        let h = '<div class="ff-sec"><h4>选角色</h4><p>主角色（会按 TA 的人设来写）</p>' + charChips('charId', false) + '</div>';
+        let h = tabsHtml() + '<div class="ff-sec"><h4>选角色</h4><p>主角色（会按 TA 的人设来写）</p>' + charChips('charId', false) + '</div>';
         if (needSecond()) h += '<div class="ff-sec"><h4>另一位角色</h4>' + charChips('char2', false) + '</div>';
         h += '<div class="ff-sec"><h4>怎么提要求</h4><div class="xa-chips" data-mode="1"><button data-md="fine" class="' + (st.mode === 'fine' ? 'on' : '') + '">精细选项</button><button data-md="free" class="' + (st.mode === 'free' ? 'on' : '') + '">只写自由描述</button></div></div>';
         if (st.mode === 'free') {
@@ -109,7 +137,7 @@
         }
         h += '<div class="ff-sec"><h4>融入真实相处</h4><p>参考我和 TA 最近的聊天、TA 记住的事，让故事更像「我们」。</p><div class="xa-chips" data-mem="1"><button data-m="1" class="' + (st.useMem ? 'on' : '') + '">融入</button><button data-m="0" class="' + (!st.useMem ? 'on' : '') + '">不用</button></div></div>';
         h += '<div class="xa-btns"><button id="ffReset">清空所有选择</button></div>';
-        body.innerHTML = h;
+        body.innerHTML = h; bindTabs(body);
         bar.innerHTML = '<span>' + esc(summary()) + '</span><button class="pri" id="ffGo">' + (busy ? '正在写…' : '生成同人文') + '</button>';
         bind(body, bar);
     }
@@ -130,7 +158,7 @@
             if (i >= 0) sel.splice(i, 1);
             else if (max === 1) st.sel[k] = [v];
             else if (!max || sel.length < max) sel.push(v);
-            else { showBanner && showBanner('「' + GINFO[k][1] + '」最多选 ' + max + ' 个'); return; }
+            else { uiAlert('「' + GINFO[k][1] + '」最多选 ' + max + ' 个', 1600); return; }
             save(); render();
         });
         body.querySelectorAll('[data-t]').forEach(el => el.oninput = () => { st.txt[el.dataset.t] = el.value; save(); const s = bar.querySelector('span'); if (s) s.textContent = summary(); });
@@ -143,7 +171,9 @@
     function spec() {
         const me = store.getItem('myName') || '我', c = getChar(st.charId), c2 = needSecond() ? getChar(st.char2) : null;
         const L = [], S = (k) => (st.sel[k] || []).join('、');
+        const mgi = myGenderInfo(), cgi = charGenderInfo(c), c2g = c2 ? charGenderInfo(c2) : null;
         L.push('【主角】' + c.name + (c2 ? '、' + c2.name : '') + '；"我"指读者本人，名字叫「' + me + '」。');
+        L.push('【性别与人称（必须严格遵守）】' + me + (mgi.g ? '是' + mgi.g + '，文中第三人称只能写「' + mgi.p + '」' + (mgi.p === '她' ? '，绝不能写成「他」' : '，绝不能写成「她」') : '性别未说明，第三人称用「TA」') + '；' + c.name + (cgi.g ? '是' + cgi.g + '生，写作「' + cgi.p + '」' : '性别按人设') + (c2 ? '；' + c2.name + (c2g.g ? '是' + c2g.g + '生，写作「' + c2g.p + '」' : '性别按人设') : '') + '。路人配角按各自性别用「他/她」，前后一致。');
         if (st.mode === 'free') { L.push('【我的要求（自由描述）】\n' + st.free.trim()); return L.join('\n'); }
         GROUPS.forEach(g => { const v = S(g[0]); if (v) L.push('【' + g[1] + '】' + v); });
         TEXTS.forEach(t => { const v = String(st.txt[t[0]] || '').trim(); if (v && t[0] !== 'title') L.push('【' + t[1].replace(/（.*?）/, '') + '】' + v); });
@@ -170,7 +200,7 @@
         try {
             const raw = await chatCompletion([{ role: 'system', content: sys }, { role: 'user', content: spec() }], 1.0);
             cur = parse(raw, c, c2); cur.spec = spec(); cur.cfg = JSON.parse(JSON.stringify({ mode: st.mode, sel: st.sel }));
-            cur.sys = sys; view = 'make';
+            cur.sys = sys; view = 'make'; pushHist(cur);
         } catch (e) { uiAlert('生成失败：' + (e && e.message)); }
         busy = false; render();
     }
@@ -185,19 +215,19 @@
 
     // ---------- 结果页 ----------
     function renderOut(body, bar) {
-        body.innerHTML = '<div class="ff-out"><h3>《' + esc(cur.title) + '》</h3>' + esc(cur.text) + '</div><div class="xa-title" style="text-align:center">' + esc(cur.charName) + ' · 约 ' + wc(cur.text) + ' 字' + (cur.saved ? ' · 已收藏' : '') + '</div>' +
+        body.innerHTML = tabsHtml() + '<div class="ff-out"><h3>《' + esc(cur.title) + '》</h3>' + esc(cur.text) + '</div><div class="xa-title" style="text-align:center">' + esc(cur.charName) + ' · 约 ' + wc(cur.text) + ' 字' + (cur.saved ? ' · 已收藏' : '') + '</div>' +
             '<div class="xa-btns" style="flex-wrap:wrap"><button id="ffCont">续写下一章</button><button id="ffRev">按意见修改</button><button id="ffAgain">重新生成</button></div><div class="xa-btns"><button id="ffCopy">复制全文</button><button id="ffEdit">手动编辑</button><button id="ffSave" class="pri">' + (cur.saved ? '取消收藏' : '收藏') + '</button></div><div class="xa-btns"><button id="ffBack">返回修改选项</button></div>';
-        bar.innerHTML = '';
+        bar.innerHTML = ''; bindTabs(body);
         $('ffBack').onclick = () => { cur = null; render(); };
-        $('ffCopy').onclick = () => { copyText('《' + cur.title + '》\n\n' + cur.text); showBanner && showBanner('已复制'); };
-        $('ffSave').onclick = () => { cur.saved = !cur.saved; const lib = jget(LIB, []).filter(x => x.id !== cur.id); if (cur.saved) lib.unshift(strip(cur)); jset(LIB, lib); render(); };
+        $('ffCopy').onclick = () => { copyText('《' + cur.title + '》\n\n' + cur.text); uiAlert('已复制', 1200); };
+        $('ffSave').onclick = () => { cur.saved = !cur.saved; const lib = jget(LIB, []).filter(x => x.id !== cur.id); if (cur.saved) lib.unshift(strip(cur)); jset(LIB, lib); pushHist(cur); render(); };
         $('ffAgain').onclick = () => { cur = null; generate(); };
         $('ffEdit').onclick = async () => { const v = await uiPrompt('手动修改正文：', cur.text, { multiline: true }); if (v === null) return; cur.text = String(v); sync(); render(); };
         $('ffCont').onclick = () => more('请接着上文写下一章（第 ' + (cur.chapters + 1) + ' 章），承接前文剧情和人物关系，篇幅与前文相近。第一行写本章小标题（用《》括起来），空一行后写正文。', true);
         $('ffRev').onclick = async () => { const v = await uiPrompt('想怎么改？', '', { placeholder: '例如：结局改成HE / 多一点对话 / 更虐一点 / 开头重写' }); if (!v || !String(v).trim()) return; more('请按下面的意见，把整篇重写一遍（保留书名与主要设定，除非意见要求改动）：' + String(v).trim() + '。第一行仍写《书名》，空一行后写正文。', false); };
     }
     function strip(o) { return { id: o.id, title: o.title, text: o.text, charId: o.charId, charName: o.charName, ts: o.ts, saved: true, chapters: o.chapters, spec: o.spec, sys: o.sys }; }
-    function sync() { if (!cur.saved) return; const lib = jget(LIB, []).map(x => x.id === cur.id ? strip(cur) : x); jset(LIB, lib); }
+    function sync() { pushHist(cur); if (!cur.saved) return; const lib = jget(LIB, []).map(x => x.id === cur.id ? strip(cur) : x); jset(LIB, lib); }
     async function more(ask, append) {
         if (busy) return; busy = true; $('ffCont').textContent = $('ffRev').textContent = '正在写…';
         try {
@@ -216,9 +246,11 @@
     // ---------- 作品库 ----------
     function renderLib(body, bar) {
         bar.innerHTML = ''; const lib = jget(LIB, []);
-        if (!lib.length) { body.innerHTML = '<div class="xa-empty">还没有收藏的作品<br>生成后点「收藏」就会出现在这里</div>'; return; }
-        body.innerHTML = lib.map(o => '<div class="ff-lib" data-id="' + o.id + '"><div class="l"><b>《' + esc(o.title) + '》</b><span>' + esc(o.charName) + ' · ' + wc(o.text) + ' 字 · ' + new Date(o.ts).toLocaleDateString() + '</span></div><button class="hdr-btn" data-del="' + o.id + '">删除</button></div>').join('');
+        if (!lib.length) { body.innerHTML = tabsHtml() + '<div class="xa-empty">还没有收藏的作品<br>生成后点「收藏」就会出现在这里<br>（没收藏的也能在「生成记录」里找到）</div>'; bindTabs(body); body.onclick = null; return; }
+        body.innerHTML = tabsHtml() + lib.map(o => '<div class="ff-lib" data-id="' + o.id + '"><div class="l"><b>《' + esc(o.title) + '》</b><span>' + esc(o.charName) + ' · ' + wc(o.text) + ' 字 · ' + new Date(o.ts).toLocaleDateString() + '</span></div><button class="hdr-btn" data-del="' + o.id + '">删除</button></div>').join('');
+        bindTabs(body);
         body.onclick = async (e) => {
+            if (e.target.closest('[data-tab]')) return;
             const d = e.target.closest('[data-del]');
             if (d) { if (!(await uiConfirm('删除这篇作品吗？'))) return; jset(LIB, jget(LIB, []).filter(x => x.id !== d.dataset.del)); render(); return; }
             const r = e.target.closest('.ff-lib'); if (!r) return; const o = jget(LIB, []).find(x => x.id === r.dataset.id); if (!o) return;

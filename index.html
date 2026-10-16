@@ -5,17 +5,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>我的小手机</title>
     <meta http-equiv="Cache-Control" content="no-cache">
-    <script>try{var __b=JSON.parse(localStorage.getItem('xsj_boot')||'null');if(__b){var __r=document.documentElement;for(var __k in __b.v)__r.style.setProperty(__k,__b.v[__k]);if(__b.t)__r.setAttribute('data-theme',__b.t);if(__b.m)__r.classList.add('theme-mono');}}catch(e){}setTimeout(function(){document.documentElement.classList.add('app-ready')},9000);</script>
-    <style>html:not(.app-ready) .phone>*{visibility:hidden}html:not(.app-ready) .phone>#bootSplash{visibility:visible}</style>
-    <link rel="stylesheet" href="style.css?v=20261013">
-    <link rel="stylesheet" href="homeland.css?v=20261013">
-    <link rel="stylesheet" href="forum-x.css?v=20261013">
-    <link rel="stylesheet" href="splash.css?v=20261014">
-    <link rel="stylesheet" href="match.css?v=20261014">
-    <link rel="stylesheet" href="apps-extra.css?v=20261015">
+    <script>try{var __b=JSON.parse(localStorage.getItem('xsj_boot')||'null');if(__b){var __r=document.documentElement;for(var __k in __b.v)__r.style.setProperty(__k,__b.v[__k]);if(__b.t)__r.setAttribute('data-theme',__b.t);if(__b.m)__r.classList.add('theme-mono');}}catch(e){}setTimeout(function(){document.documentElement.classList.add('app-ready')},30000);</script>
+    <style>
+    /* 加载期间：整个小手机内容先藏起来，只显示一块干净的底色 + 小圆点，绝不会露出还没渲染好的占位页面 */
+    html:not(.app-ready) .phone>*{visibility:hidden}
+    html:not(.app-ready) .phone>#bootSplash,html:not(.app-ready) .phone>#bootCover{visibility:visible}
+    #bootCover{position:absolute;inset:0;z-index:99990;background:var(--bg-color,#f7f2f4);display:flex;align-items:center;justify-content:center;transition:opacity .35s ease}
+    #bootCover i{width:9px;height:9px;border-radius:50%;background:var(--theme-color,#e8a0b8);margin:0 5px;opacity:.25;animation:bcDot 1s infinite ease-in-out}
+    #bootCover i:nth-child(2){animation-delay:.15s}#bootCover i:nth-child(3){animation-delay:.3s}
+    @keyframes bcDot{0%,80%,100%{opacity:.25;transform:scale(.8)}40%{opacity:1;transform:scale(1.15)}}
+    html.app-ready #bootCover{opacity:0;pointer-events:none;visibility:hidden}
+    </style>
+    <!-- 提前并行下载所有脚本（原来要等本地数据读完才开始下载，慢网络下会拖很久） -->
+    <link rel="preload" as="script" href="script.js?v=20261017">
+    <link rel="preload" as="script" href="together.js?v=20261017">
+    <link rel="preload" as="script" href="games.js?v=20261017">
+    <link rel="preload" as="script" href="life.js?v=20261017">
+    <link rel="preload" as="script" href="home.js?v=20261017">
+    <link rel="preload" as="script" href="home-folder.js?v=20261017">
+    <link rel="preload" as="script" href="tts.js?v=20261017">
+    <link rel="preload" as="script" href="period.js?v=20261017">
+    <link rel="preload" as="script" href="memory.js?v=20261017">
+    <link rel="preload" as="script" href="card-import.js?v=20261017">
+    <link rel="preload" as="script" href="forum.js?v=20261017">
+    <link rel="preload" as="script" href="forum-x.js?v=20261017">
+    <link rel="preload" as="script" href="forum-hot.js?v=20261017">
+    <link rel="preload" as="script" href="map.js?v=20261017">
+    <link rel="preload" as="script" href="couple.js?v=20261017">
+    <link rel="preload" as="script" href="homeland-art.js?v=20261017">
+    <link rel="preload" as="script" href="homeland-items.js?v=20261017">
+    <link rel="preload" as="script" href="homeland-char.js?v=20261017">
+    <link rel="preload" as="script" href="homeland.js?v=20261017">
+    <link rel="preload" as="script" href="shop-extra.js?v=20261017">
+    <link rel="preload" as="script" href="phone-swap.js?v=20261017">
+    <link rel="preload" as="script" href="match.js?v=20261017">
+    <link rel="preload" as="script" href="chat-extra.js?v=20261017">
+    <link rel="preload" as="script" href="agenda.js?v=20261017">
+    <link rel="preload" as="script" href="countdown.js?v=20261017">
+    <link rel="preload" as="script" href="icost.js?v=20261017">
+    <link rel="preload" as="script" href="fanfic.js?v=20261017">
+    <link rel="preload" as="script" href="study-data.js?v=20261017">
+    <link rel="preload" as="script" href="study.js?v=20261017">
+    <link rel="preload" as="script" href="photo-stack.js?v=20261017">
+    <link rel="preload" as="script" href="backup.js?v=20261017">
+
+    <link rel="stylesheet" href="style.css?v=20261017">
+    <link rel="stylesheet" href="homeland.css?v=20261017">
+    <link rel="stylesheet" href="forum-x.css?v=20261017">
+    <link rel="stylesheet" href="splash.css?v=20261017">
+    <link rel="stylesheet" href="match.css?v=20261017">
+    <link rel="stylesheet" href="apps-extra.css?v=20261017">
 </head>
 <body>
     <div class="phone">
+        <div id="bootCover" aria-hidden="true"><i></i><i></i><i></i></div>
         <script src="splash.js?v=20261014"></script>
         <!-- 锁屏 -->
         <div id="lockScreen" class="lock-screen">
@@ -557,7 +600,7 @@
                 </div>
                 <div id="nestMain" class="hidden">
                     <div id="nestScene" class="nest-scene pet s0">
-                        <div class="nest-top"><span id="nestLv">Lv.1</span><div class="nest-exp"><div id="nestExpFill"></div></div><span id="nestCoins">🪙 0</span></div>
+                        <div class="nest-top"><span id="nestLv">Lv.1</span><div class="nest-exp"><div id="nestExpFill"></div></div><span id="nestCoins">◎ 0</span></div>
                         <div id="nestBubble" class="nest-bubble"></div>
                         <div id="nestCreature" class="nest-creature">🥚</div>
                         <div class="nest-ground"></div>
@@ -644,7 +687,7 @@
                     <button class="intimate-btn" data-action="whisper"><span class="ib-icon">(・ω・)ﾉ</span><span class="ib-label">耳语</span></button>
                     <button class="intimate-btn" data-action="forehead_kiss"><span class="ib-icon">(˘ ³˘)♡</span><span class="ib-label">额头吻</span></button>
                     <button class="intimate-btn" data-action="lap_pillow"><span class="ib-icon">(´ ∀ `)</span><span class="ib-label">膝枕</span></button>
-                    <button class="intimate-btn" data-action="poke"><span class="ib-icon">(•̀ᴗ•́)👉</span><span class="ib-label">戳一戳</span></button>
+                    <button class="intimate-btn" data-action="poke"><span class="ib-icon">(•̀ᴗ•́)✧</span><span class="ib-label">戳一戳</span></button>
                 </div>
                 <button id="fullIntimateBtn" class="btn-primary">进入全屏亲密互动 (๑´ᵕ`๑)</button>
                 <div id="intimateReply" class="intimate-reply"></div>
@@ -939,7 +982,13 @@
                 <div class="cell-group">
                     <div class="cell-item"><span>流式输出（边生成边显示）</span><input type="checkbox" id="chatStreamToggle" class="ios-switch"></div>
                     <div class="cell-item"><span>分段连发（像真人发多条）</span><input type="checkbox" id="chatSplitToggle" class="ios-switch"></div>
-                    <div class="cell-item"><span>让TA看懂图片（需模型支持视觉）</span><input type="checkbox" id="chatVisionToggle" class="ios-switch"></div>
+                    <div class="cell-item"><span>TA 识图方式</span><select id="visionMode" class="input-text" style="width:auto;margin:0"><option value="main">用聊天模型直接看（需支持视觉）</option><option value="sep">用单独的识图接口</option><option value="off">不识图</option></select></div>
+                    <div id="visionSep" style="display:none"><div class="cell-item"><span>识图接口地址</span><input id="visionUrl" class="input-text" style="width:58%;margin:0" placeholder="留空=同聊天接口"></div><div class="cell-item"><span>识图 Key</span><input id="visionKey" type="password" class="input-text" style="width:58%;margin:0" placeholder="留空=同聊天 Key"></div><div class="cell-item"><span>识图模型</span><input id="visionModel" class="input-text" style="width:58%;margin:0" placeholder="如 gpt-4o-mini / gemini-1.5-flash"></div><p class="hint-line">聊天模型不支持看图时，用这里一个能看图的模型先把图片“看”成文字，再交给 TA 回应，TA 之后还会记得图里有什么。</p></div>
+                    <div class="cell-item"><span>发送方式</span><select id="sendModeSel" class="input-text" style="width:auto;margin:0"><option value="live">发一条回一条（现在这样）</option><option value="idle">停顿几秒后一起回</option><option value="manual">我点「让TA回复」才回</option></select></div>
+                    <div class="cell-item" id="sendIdleRow" style="display:none"><span>停顿多久后回复 <b id="sendIdleV">6</b> 秒</span><input type="range" id="sendIdle" min="2" max="30" step="1" style="width:42%"></div>
+                    <div class="cell-item"><span>活人感模式（更像真人聊天）</span><input type="checkbox" id="chatLiveToggle" class="ios-switch"></div>
+                    <div class="cell-item"><span>回复随机度 <small id="chatTempVal" style="color:var(--text-sub)">1</small></span><input type="range" id="chatTempRange" min="0.4" max="1.4" step="0.1" style="width:42%"></div>
+                    <div class="cell-item" id="liveEditBtn" style="cursor:pointer"><span>查看 / 自定义活人感指令</span><span style="color:var(--text-sub)">›</span></div>
                 </div>
                 <p class="hint-line">点聊天里的气泡可以复制、引用、撤回（2分钟内）、编辑、删除，最后一组 TA 的消息还能重新生成。TA 也会引用你的话、撤回消息。</p>
                 <p class="section-title">TA 发照片</p>
@@ -1093,11 +1142,12 @@
     <script>
     (window.storeReady||Promise.resolve()).then(function(){
         // 每次发布改一下 B，浏览器就一定会拿最新文件；所有脚本并行下载、按顺序执行，比原来一个接一个快
-        var B='20261015', files=['script.js','together.js','games.js','life.js','home.js','home-folder.js','tts.js','period.js','memory.js','card-import.js','forum.js','forum-x.js','forum-hot.js','map.js','couple.js','homeland-art.js','homeland-items.js','homeland-char.js','homeland.js','shop-extra.js','phone-swap.js','match.js','chat-extra.js','agenda.js','countdown.js','icost.js','fanfic.js','backup.js'], left=files.length, done=false;
+        var B='20261017', files=['script.js','together.js','games.js','life.js','home.js','home-folder.js','tts.js','period.js','memory.js','card-import.js','forum.js','forum-x.js','forum-hot.js','map.js','couple.js','homeland-art.js','homeland-items.js','homeland-char.js','homeland.js','shop-extra.js','phone-swap.js','match.js','chat-extra.js','agenda.js','countdown.js','icost.js','fanfic.js','study-data.js','study.js','doodle.js','photo-stack.js','backup.js'], left=files.length, done=false;
         function finish(){
             if(done)return; done=true;
             try{ if(window.renderHome) window.renderHome(); }catch(e){}   // 后面才加载的应用（地图/广场/回忆…）在这里补进桌面，不用再切一次应用
             document.documentElement.classList.add('app-ready');
+            setTimeout(function(){var c=document.getElementById('bootCover');if(c)c.remove();},600);
         }
         files.forEach(function(f){
             var s=document.createElement('script'); s.src=f+'?v='+B; s.async=false;

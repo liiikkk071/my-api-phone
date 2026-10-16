@@ -38,21 +38,38 @@
             audio.play().catch(() => reject(new Error('浏览器拦截了自动播放，先点一下屏幕再试')));
         });
     }
-    function speakBrowser(text) {
+    function speakBrowser(text, lang, rate) {
         return new Promise((resolve) => {
             if (!('speechSynthesis' in window)) { uiAlert('这个浏览器不支持语音朗读'); return resolve(); }
-            const u = new SpeechSynthesisUtterance(text); u.lang = 'zh-CN'; u.rate = cfg().speed; u.onend = u.onerror = () => resolve(); speechSynthesis.speak(u);
+            const u = new SpeechSynthesisUtterance(text); u.lang = lang || 'zh-CN'; u.rate = rate || cfg().speed; u.onend = u.onerror = () => resolve(); speechSynthesis.speak(u);
         });
     }
     window.ttsStop = stop;
+    const blobCache = new Map();
+    // opts: provider / force / throw / lang(浏览器朗读语言) / speed / voice(覆盖声音ID) / cache(缓存音频，学习跟读用)
     window.ttsSpeak = async function (text, charId, opts) {
-        const c = cfg(), prov = (opts && opts.provider) || c.provider; if (prov === 'off') { if (!(opts && opts.force)) return; }
+        opts = opts || {};
+        const c = cfg(), prov = opts.provider || c.provider; if (prov === 'off') { if (!opts.force) return; }
         const t = clean(text); if (!t) return; stop();
+        if (opts.speed) c.speed = opts.speed;
+        if (opts.voice) { c.el.voice = opts.voice; c.fish.voice = opts.voice; charId = null; }
         try {
-            if (prov === 'browser') await speakBrowser(t);
-            else if (prov === 'elevenlabs' || prov === 'fish') await playBlob(await fetchAudio(prov, t, charId, c));
-        } catch (e) { uiAlert('语音：' + e.message, 4200); if (opts && opts.throw) throw e; }
+            if (prov === 'browser') await speakBrowser(t, opts.lang, opts.speed);
+            else if (prov === 'elevenlabs' || prov === 'fish') {
+                const key = opts.cache ? [prov, charId || '', opts.voice || '', c.speed, t].join('|') : '';
+                let blob = key && blobCache.get(key);
+                if (!blob) { blob = await fetchAudio(prov, t, charId, c); if (key) { blobCache.set(key, blob); if (blobCache.size > 60) blobCache.delete(blobCache.keys().next().value); } }
+                await playBlob(blob);
+            }
+        } catch (e) { if (!opts.silent) uiAlert('语音：' + e.message, 4200); if (opts.throw) throw e; }
     };
+    // 是否已接入了可用的自定义声音（Key 和声音 ID 齐全），给学习功能判断用
+    window.ttsReady = function (charId, voice) {
+        const c = cfg(); if (c.provider !== 'elevenlabs' && c.provider !== 'fish') return null;
+        const p = c.provider === 'fish' ? c.fish : c.el; if (!p.key) return null;
+        return (voice || voiceFor(c, c.provider, charId)) ? c.provider : null;
+    };
+    window.ttsProvider = () => cfg().provider;
 
     // ---------- 设置面板 ----------
     function panel() {

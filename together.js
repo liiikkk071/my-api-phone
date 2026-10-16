@@ -147,8 +147,8 @@
             '<div class="tg-card tg-player"><div class="tg-stage" id="tgStage"><video id="tgVideo" playsinline controls preload="metadata"></video>' +
             '<div class="tg-art"><div class="tg-eq"><i></i><i></i><i></i><i></i><i></i></div><div class="tg-art-title" id="tgArtTitle">选一首歌或一部电影</div></div></div>' +
             '<div class="tg-live" id="tgLive"></div></div>' +
-            '<div class="tg-row"><label class="btn-small tg-file">🎵 选音乐 / 电影<input type="file" id="tgFile" accept="audio/*,video/*,.mp3,.m4a,.flac,.wav,.ogg,.mp4,.webm,.mkv,.mov"></label>' +
-            '<label class="btn-small tg-file">📝 字幕 / 歌词<input type="file" id="tgSub" accept=".srt,.vtt,.lrc,.txt"></label></div>' +
+            '<div class="tg-row"><label class="btn-small tg-file">♪ 选音乐 / 电影<input type="file" id="tgFile" accept="audio/*,video/*,.mp3,.m4a,.flac,.wav,.ogg,.mp4,.webm,.mkv,.mov"></label>' +
+            '<label class="btn-small tg-file">✎ 字幕 / 歌词<input type="file" id="tgSub" accept=".srt,.vtt,.lrc,.txt"></label></div>' +
             '<div class="tg-row"><input id="tgUrl" class="input-text" placeholder="或粘贴 mp3 / mp4 / webm 直链"><button class="btn-small" id="tgUrlBtn">加载</button></div>' +
             '<div class="tg-card"><div class="pk-cap">谁陪你</div>' +
             '<div class="tg-who" id="tgWho"></div>' +

@@ -51,6 +51,20 @@
     const catOf = (d, t, id) => (d.cats[t] || []).find(c => c.id === id) || { name: '其他', ic: 'other', color: '#8d94a0' };
     const accOf = (d, id) => d.accounts.find(a => a.id === id) || { name: '(已删除)', color: '#8d94a0' };
     const txs = (d) => d.tx.filter(x => x.lg === d.cur);
+    const lgOf = (d) => d.ledgers.find(l => l.id === d.cur) || d.ledgers[0];
+    const isShared = (d) => !!lgOf(d).shared;
+    const shChar = (d) => getChar(lgOf(d).charId) || getChar(getActiveCharId());
+    const shName = (d) => { const c = shChar(d); return c ? c.name : 'TA'; };
+    const goalOf = (d) => { const l = lgOf(d); return l.goal && l.goal.target > 0 ? l.goal : null; };
+    const hasAI = () => typeof API_KEY !== 'undefined' && !!API_KEY;
+    // 一起管理时，TA 的互动：全部由人设现场生成，不用固定台词
+    async function taSay(d, event, opt) {
+        const c = shChar(d); if (!c || !hasAI()) return '';
+        const lg = lgOf(d), mm = txs(d).filter(x => x.date.slice(0, 7) === T().slice(0, 7)), out = sum(mm, 'out'), bud = +d.budget[d.cur] || 0, g = goalOf(d);
+        const ctx = '【我们在 iCost 里一起管理账本「' + lg.name + '」】本月共同支出 ' + money(out) + (bud ? '，月预算 ' + money(bud) + (out > bud ? '（已超支）' : '，还剩 ' + money(bud - out)) : '') + (g ? '。共同目标「' + g.name + '」' + money(g.saved || 0) + ' / ' + money(g.target) : '') + '。';
+        try { return oneLine(await callPersona(c.id, timeContext() + '\n' + ctx + '\n' + event + '\n请完全按你的人设和说话习惯，自然地说一两句话（不超过 40 字），不要套用模板，不要复述这些信息，只输出这句话。', 1.1)).slice(0, 80); } catch (e) { return ''; }
+    }
+    function note2chat(d, text) { try { const c = shChar(d); if (c && typeof logActivity === 'function') logActivity(c.id, 'icost', '【我（用户）和你（' + c.name + '）一起管理账本】' + text); } catch (e) { } }
     function sum(a, t) { return a.filter(x => x.type === t).reduce((s, x) => s + x.amt, 0); }
     function balance(d, ac) { let b = +ac.init || 0; d.tx.forEach(x => { if (x.type === 'out' && x.acc === ac.id) b -= x.amt; else if (x.type === 'in' && x.acc === ac.id) b += x.amt; else if (x.type === 'tr') { if (x.acc === ac.id) b -= x.amt; if (x.to === ac.id) b += x.amt; } }); return b; }
 
@@ -80,14 +94,15 @@
     const shiftYm = (s, n) => { let y = +s.slice(0, 4), m = +s.slice(5, 7) + n; while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; } return y + '-' + pad(m); };
     function txRow(d, x) {
         if (x.type === 'tr') return '<div class="ic-tx" data-id="' + x.id + '"><span class="ic-ico" style="background:#8d94a0">' + svg('swap') + '</span><div class="l"><b>转账</b><span>' + esc(accOf(d, x.acc).name) + ' → ' + esc(accOf(d, x.to).name) + (x.note ? ' · ' + esc(x.note) : '') + '</span></div><div class="a tr">' + money(x.amt) + '</div></div>';
-        const c = catOf(d, x.type, x.cat);
-        return '<div class="ic-tx" data-id="' + x.id + '"><span class="ic-ico" style="background:' + c.color + '">' + svg(c.ic) + '</span><div class="l"><b>' + esc(c.name) + '</b><span>' + esc(accOf(d, x.acc).name) + (x.note ? ' · ' + esc(x.note) : '') + '</span></div><div class="a ' + (x.type === 'in' ? 'in' : '') + '">' + (x.type === 'in' ? '+' : '-') + money(x.amt) + '</div></div>';
+        const c = catOf(d, x.type, x.cat), sh = isShared(d);
+        return '<div class="ic-tx" data-id="' + x.id + '"><span class="ic-ico" style="background:' + c.color + '">' + svg(c.ic) + '</span><div class="l"><b>' + esc(c.name) + (sh ? ' <i class="ic-by' + (x.by === 'ta' ? ' ta' : '') + '">' + (x.by === 'ta' ? esc(shName(d)) : '我') + '</i>' : '') + (sh && x.aa ? ' <i class="ic-by aa">AA' + (x.settled ? '·已结' : '') + '</i>' : '') + '</b><span>' + esc(accOf(d, x.acc).name) + (x.note ? ' · ' + esc(x.note) : '') + '</span>' + (x.cm ? '<span class="ic-cm">' + esc(shName(d)) + '：' + esc(x.cm) + '</span>' : '') + '</div><div class="a ' + (x.type === 'in' ? 'in' : '') + '">' + (x.type === 'in' ? '+' : '-') + money(x.amt) + '</div></div>';
     }
     function bill(d, body) {
         const a = txs(d).filter(x => x.date.slice(0, 7) === ym), out = sum(a, 'out'), inn = sum(a, 'in'), bud = +d.budget[d.cur] || 0, isNow = ym === T().slice(0, 7);
         let h = '<div class="ic-top"><div class="m"><button id="icPm">‹</button><span>' + ym.slice(0, 4) + '年' + +ym.slice(5) + '月 · 支出</span><button id="icNm">›</button></div><div class="big">' + money(out) + '</div><div class="row3"><div>收入<b>' + money(inn) + '</b></div><div>结余<b>' + money(inn - out) + '</b></div>' + (isNow && out ? '<div>日均支出<b>' + money(out / new Date().getDate()) + '</b></div>' : '') + '</div>';
         if (bud) { const pct = Math.min(100, out / bud * 100); h += '<div class="ic-bud' + (out > bud ? ' over' : '') + '">月预算 ' + money(bud) + ' · ' + (out > bud ? '已超支 ' + money(out - bud) : '还剩 ' + money(bud - out)) + '<div class="bar"><i style="width:' + pct + '%"></i></div></div>'; }
         h += '</div>';
+        if (isShared(d)) h += sharedPanel(d, a);
         if (!a.length) h += '<div class="xa-empty">这个月还没有账单<br>点下面中间的「＋」记一笔吧</div>';
         else {
             const by = {}; a.forEach(x => (by[x.date] = by[x.date] || []).push(x));
@@ -96,6 +111,48 @@
         body.innerHTML = h;
         $('icPm').onclick = () => { ym = shiftYm(ym, -1); render(); }; $('icNm').onclick = () => { ym = shiftYm(ym, 1); render(); };
         body.querySelectorAll('[data-id]').forEach(e => e.onclick = () => addSheet(e.dataset.id));
+        if (isShared(d)) bindShared(d, body);
+    }
+    // ---------- 一起管理 ----------
+    function aaCalc(a) { let me = 0, ta = 0; a.filter(x => x.type === 'out' && x.aa && !x.settled).forEach(x => { if (x.by === 'ta') ta += x.amt; else me += x.amt; }); const net = (me - ta) / 2; return { me: me, ta: ta, net: net }; }
+    function sharedPanel(d, a) {
+        const c = shChar(d), nm = esc(shName(d)), outs = a.filter(x => x.type === 'out'), my = sum(outs.filter(x => x.by !== 'ta'), 'out'), tp = sum(outs.filter(x => x.by === 'ta'), 'out'), aa = aaCalc(txs(d)), g = goalOf(d);
+        let h = '<div class="ic-sh"><div class="ic-sh-hd"><span class="avatar-small">' + (c && typeof charAvatarInner === 'function' ? charAvatarInner(c) : '') + '</span><div><b>与 ' + nm + ' 一起管理</b><small>本月 我花 ' + money(my) + ' · ' + nm + ' 花 ' + money(tp) + '</small></div></div>';
+        if (aa.me || aa.ta) h += '<div class="ic-aa">AA 待结算：' + (Math.abs(aa.net) < 0.005 ? '刚好扯平' : aa.net > 0 ? nm + ' 该转给我 <b>' + money(aa.net) + '</b>' : '我该转给 ' + nm + ' <b>' + money(-aa.net) + '</b>') + '<button id="shSettle">结清</button></div>';
+        if (g) { const p = Math.min(100, (g.saved || 0) / g.target * 100); h += '<div class="ic-goal"><div><b>共同目标 · ' + esc(g.name) + '</b><span>' + money(g.saved || 0) + ' / ' + money(g.target) + '</span></div><div class="bar"><i style="width:' + p + '%"></i></div><div class="ic-goal-btns"><button id="shSave">存一笔</button><button id="shGoal">修改目标</button></div></div>'; }
+        h += '<div class="ic-sh-btns">' + (g ? '' : '<button id="shGoal">设共同目标</button>') + '<button id="shTa">' + (shBusy ? nm + ' 在忙…' : '让 ' + nm + ' 记一笔') + '</button><button id="shTalk">和 ' + nm + ' 聊聊这个月</button></div>' + (shText ? '<div class="ic-ta">' + esc(shText) + '</div>' : '') + '</div>';
+        return h;
+    }
+    let shBusy = false, shText = '';
+    function bindShared(d, body) {
+        const b = (id, fn) => { const e = $(id); if (e) e.onclick = fn; };
+        b('shSettle', async () => { if (!(await uiConfirm('把目前所有 AA 的账都标记为已结清？'))) return; const dd = D(); dd.tx.forEach(x => { if (x.lg === dd.cur && x.aa) x.settled = 1; }); S(dd); render(); const t = await taSay(dd, '我们刚把 AA 的账结清了。'); if (t) { shText = t; render(); } });
+        b('shGoal', () => goalSheet());
+        b('shSave', async () => { const v = await uiPrompt('这次往「' + goalOf(d).name + '」存多少钱？（元）', '', { placeholder: '例如 100' }); if (v == null) return; const n = parseFloat(v); if (!(n > 0)) { uiAlert('请输入大于 0 的数字'); return; } const dd = D(), g = lgOf(dd).goal; g.saved = (g.saved || 0) + n; g.log = (g.log || []).concat([{ by: 'me', amt: n, ts: Date.now() }]).slice(-30); S(dd); render(); note2chat(dd, '我往共同目标「' + g.name + '」存了 ¥' + n + '，现在 ' + money(g.saved) + '/' + money(g.target) + '。'); const t = await taSay(dd, '我刚往共同目标「' + g.name + '」存了 ' + money(n) + '，现在 ' + money(g.saved) + '/' + money(g.target) + (g.saved >= g.target ? '，目标达成了！' : '。')); if (t) { shText = t; render(); } });
+        b('shTa', () => taSpend());
+        b('shTalk', () => taReview(D(), ym, [], true));
+    }
+    async function goalSheet() {
+        const d = D(), g = lgOf(d).goal || { name: '', target: '', saved: 0 };
+        const m = sheet('<h3>共同目标</h3><p class="st-note">比如「一起去旅行」「给 TA 买的礼物」。你和 ' + esc(shName(d)) + ' 都可以往里存。</p><div class="xa-row"><span>目标名称</span><input id="gnN" maxlength="14" value="' + esc(g.name) + '" style="text-align:right"></div><div class="xa-row"><span>目标金额（元）</span><input id="gnT" type="number" min="1" value="' + esc(g.target) + '" style="text-align:right"></div><div class="xa-btns">' + (lgOf(d).goal ? '<button class="dan" id="gnDel">取消目标</button>' : '') + '<button id="gnX">取消</button><button class="pri" id="gnOk">保存</button></div>');
+        m.querySelector('#gnX').onclick = () => m.remove();
+        if (lgOf(d).goal) m.querySelector('#gnDel').onclick = () => { const dd = D(); delete lgOf(dd).goal; S(dd); m.remove(); render(); };
+        m.querySelector('#gnOk').onclick = async () => { const n = m.querySelector('#gnN').value.trim(), t = parseFloat(m.querySelector('#gnT').value); if (!n || !(t > 0)) { uiAlert('填好名称和金额'); return; } const dd = D(), l = lgOf(dd), isNew = !l.goal; l.goal = { name: n, target: t, saved: (l.goal && l.goal.saved) || 0, log: (l.goal && l.goal.log) || [] }; S(dd); m.remove(); render(); if (isNew) { note2chat(dd, '我们定了共同目标「' + n + '」，要存 ¥' + t + '。'); const s = await taSay(dd, '我们刚定了一个共同目标「' + n + '」，要存 ' + money(t) + '。'); if (s) { shText = s; render(); } } };
+    }
+    // 让 TA 自己记一笔（花了什么、存了多少，全由 TA 的人设决定）
+    async function taSpend() {
+        const d = D(), c = shChar(d); if (!c) { uiAlert('先创建并选择一个角色'); return; } if (!hasAI()) { uiAlert('先在设置里填好 API Key'); return; } if (shBusy) return;
+        const cats = d.cats.out.map(x => x.name), g = goalOf(d);
+        shBusy = true; render();
+        try {
+            const j = parseJSONLoose(await callPersona(c.id, timeContext() + '\n我们在共同账本「' + lgOf(d).name + '」里一起记账。请你按自己的生活和性格，记一笔你最近自己花的钱' + (g ? '，或者往共同目标「' + g.name + '」存一笔' : '') + '。\n可选支出分类：' + cats.join('、') + '。\n只输出 JSON：{"kind":"out' + (g ? '或save' : '') + '","cat":"分类名","amt":金额数字(1~300),"note":"这笔的备注，6字内","say":"你记完后对我说的话，口语，40字内，完全按你的人设，不要模板"}', 1.1)) || {};
+            const amt = Math.round(Math.max(1, Math.min(2000, +j.amt || 0)) * 100) / 100; if (!(amt > 0)) throw new Error('没有生成有效金额');
+            const dd = D();
+            if (j.kind === 'save' && goalOf(dd)) { const gg = lgOf(dd).goal; gg.saved = (gg.saved || 0) + amt; gg.log = (gg.log || []).concat([{ by: 'ta', amt: amt, ts: Date.now() }]).slice(-30); note2chat(dd, c.name + '往共同目标「' + gg.name + '」存了 ¥' + amt + '。'); }
+            else { const cat = dd.cats.out.find(x => x.name === j.cat) || dd.cats.out.find(x => String(j.cat || '').indexOf(x.name) >= 0) || dd.cats.out[0]; dd.tx.push({ id: uid(), time: pad(new Date().getHours()) + ':' + pad(new Date().getMinutes()), type: 'out', amt: amt, acc: dd.lastAcc || dd.accounts[0].id, date: T(), note: String(j.note || '').slice(0, 20), lg: dd.cur, cat: cat.id, by: 'ta', cm: oneLine(j.say || '').slice(0, 80) }); note2chat(dd, c.name + '在共同账本记了一笔「' + cat.name + '」¥' + amt + (j.note ? '（' + j.note + '）' : '') + '。'); }
+            S(dd); shText = j.kind === 'save' ? oneLine(j.say || '') : ''; try { bumpMood(c.id, 2); } catch (e) { }
+        } catch (e) { uiAlert('TA 这次没记成：' + (e.message || e)); }
+        shBusy = false; render();
     }
     function stat(d, body) {
         const key = sp === 'm' ? ym : ym.slice(0, 4), a = txs(d).filter(x => x.date.indexOf(key) === 0 && x.type === st), total = sum(a, st);
@@ -119,11 +176,20 @@
         $('icPm').onclick = () => { ym = sp === 'm' ? shiftYm(ym, -1) : shiftYm(ym, -12); taText = ''; render(); }; $('icNm').onclick = () => { ym = sp === 'm' ? shiftYm(ym, 1) : shiftYm(ym, 12); taText = ''; render(); };
         $('icTa').onclick = () => taReview(d, key, rows);
     }
-    async function taReview(d, key, rows) {
-        const c = getChar(getActiveCharId()); if (!c) { uiAlert('先创建并选择一个角色'); return; } if (typeof API_KEY === 'undefined' || !API_KEY) { uiAlert('先在设置里填好 API Key'); return; } if (taBusy) return;
+    async function taReview(d, key, rows, sharedTalk) {
+        if (sharedTalk) { key = ym; const all0 = txs(d).filter(x => x.date.indexOf(key) === 0); rows = []; const by = {}; all0.filter(x => x.type === 'out').forEach(x => by[x.cat] = (by[x.cat] || 0) + x.amt); Object.keys(by).forEach(k => rows.push({ c: catOf(d, 'out', k), v: by[k] })); rows.sort((p, q) => q.v - p.v); }
+        const c = sharedTalk ? shChar(d) : getChar(getActiveCharId()); if (!c) { uiAlert('先创建并选择一个角色'); return; } if (typeof API_KEY === 'undefined' || !API_KEY) { uiAlert('先在设置里填好 API Key'); return; } if (taBusy || shBusy) return;
         const all = txs(d).filter(x => x.date.indexOf(key) === 0), out = sum(all, 'out'), inn = sum(all, 'in'); if (!all.length) { uiAlert('这段时间还没有账单可以点评'); return; }
         const outs = all.filter(x => x.type === 'out'), big = outs.slice().sort((p, q) => q.amt - p.amt)[0], bud = +d.budget[d.cur] || 0;
         const desc = '统计区间：' + key + '\n总支出 ' + money(out) + '，总收入 ' + money(inn) + '，共 ' + all.length + ' 笔。\n支出分类前几名：' + (rows.length ? rows.slice(0, 4).map(r => r.c.name + ' ' + money(r.v)).join('、') : '无') + '。\n' + (big ? '最大的一笔支出：' + catOf(d, 'out', big.cat).name + ' ' + money(big.amt) + (big.note ? '（' + big.note + '）' : '') + '。\n' : '') + (sp === 'm' && bud ? '本月预算 ' + money(bud) + '，' + (out > bud ? '已超支 ' + money(out - bud) : '还剩 ' + money(bud - out)) + '。' : '');
+        if (sharedTalk) {
+            const mine = sum(outs.filter(x => x.by !== 'ta'), 'out'), his = sum(outs.filter(x => x.by === 'ta'), 'out'), g = goalOf(d), aa = aaCalc(txs(d));
+            const sd = desc + '\n其中我花了 ' + money(mine) + '，你花了 ' + money(his) + '。' + (aa.me || aa.ta ? 'AA 待结算：' + (aa.net > 0 ? '你该转给我 ' + money(aa.net) : '我该转给你 ' + money(-aa.net)) + '。' : '') + (g ? '共同目标「' + g.name + '」已存 ' + money(g.saved || 0) + '/' + money(g.target) + '。' : '');
+            shBusy = true; shText = ''; render();
+            try { shText = oneLine(await callPersona(c.id, timeContext() + '\n这是我们俩一起管理的账本，月底了我想和你聊聊。请你按你的人设和我们的关系，像真人聊天一样说说这个月的开销（谁花得多、值不值、下个月怎么安排），自然、有感情，不列清单，不超过 120 字，不要套用模板。\n' + sd, 1.1)); note2chat(d, '我们一起聊了聊这个月的账，你说：' + shText); }
+            catch (e) { shText = '这次没聊成：' + (e.message || e); }
+            shBusy = false; render(); return;
+        }
         taBusy = true; taText = ''; render();
         try { taText = String(await callPersona(c.id, timeContext() + '\n这是我的记账统计，请你用你自己的口吻点评一下我的消费：夸夸我做得好的地方，温柔地提醒花得有点多的地方，再给一两条具体的小建议（比如少点外卖、给自己留点零花）。像真人聊天，不要列清单，不超过120字。\n' + desc, 1.0)).trim(); }
         catch (e) { taText = '点评失败：' + (e.message || e); }
@@ -147,21 +213,22 @@
     function me(d, body) {
         const lg = d.ledgers.find(l => l.id === d.cur) || d.ledgers[0], all = txs(d), bud = +d.budget[d.cur] || 0;
         let h = '<div class="ic-top"><div class="m"><span>' + esc(lg.name) + '</span></div><div class="big">' + all.length + ' <span style="font-size:15px">笔账单</span></div><div class="row3"><div>累计支出<b>' + money(sum(all, 'out')) + '</b></div><div>累计收入<b>' + money(sum(all, 'in')) + '</b></div></div></div>';
-        h += '<div class="ag-list"><div class="li-row" id="meBud"><b>月预算</b><em>' + (bud ? money(bud) : '未设置') + '</em><span style="color:var(--text-sub)">›</span></div><div class="li-row" id="meLg"><b>账本管理</b><em>' + d.ledgers.length + ' 个</em><span style="color:var(--text-sub)">›</span></div><div class="li-row" id="meCat"><b>分类管理</b><em>' + (d.cats.out.length + d.cats.in.length) + ' 个</em><span style="color:var(--text-sub)">›</span></div><div class="li-row" id="meCsv"><b>导出账单（CSV，可用 Excel 打开）</b><span style="color:var(--text-sub)">›</span></div><div class="li-row" id="meClr"><b style="color:#d9534f">清空当前账本</b><span style="color:var(--text-sub)">›</span></div></div>';
+        h += '<div class="ag-list"><div class="li-row" id="meBud"><b>月预算</b><em>' + (bud ? money(bud) : '未设置') + '</em><span style="color:var(--text-sub)">›</span></div><div class="li-row" id="meLg"><b>账本管理</b><em>' + d.ledgers.length + ' 个</em><span style="color:var(--text-sub)">›</span></div><div class="li-row" id="meCat"><b>分类管理</b><em>' + (d.cats.out.length + d.cats.in.length) + ' 个</em><span style="color:var(--text-sub)">›</span></div><div class="li-row" id="meCsv"><b>导出账单（CSV，可用 Excel 打开）</b><span style="color:var(--text-sub)">›</span></div><div class="li-row" id="meShare"><b>和 TA 一起管理这个账本</b><em>' + (lgOf(d).shared ? '已开启（' + esc(shName(d)) + '）' : '未开启') + '</em><span style="color:var(--text-sub)">›</span></div><div class="li-row" id="meClr"><b style="color:#d9534f">清空当前账本</b><span style="color:var(--text-sub)">›</span></div></div>';
         h += '<p class="xa-empty" style="padding:14px 6px;font-size:12px">账单只保存在你自己的浏览器里；换设备或清缓存前，请到「设置 → 数据备份」导出备份文件。</p>';
         body.innerHTML = h;
         $('meBud').onclick = async () => { const v = await uiPrompt('每月预算（元），填 0 取消预算', bud || '', { placeholder: '例如 3000' }); if (v == null) return; const n = parseFloat(v); if (isNaN(n) || n < 0) { uiAlert('请输入数字'); return; } const dd = D(); dd.budget[dd.cur] = n; S(dd); render(); };
         $('meLg').onclick = ledgerSheet; $('meCat').onclick = catSheet;
+        $('meShare').onclick = async () => { const dd = D(), l = lgOf(dd); if (l.shared) { if (!(await uiConfirm('关闭「一起管理」？已有的账单和目标会保留。', { ok: '关闭' }))) return; l.shared = false; S(dd); render(); return; } const c = getChar(getActiveCharId()); if (!c) { uiAlert('先创建并选择一个角色'); return; } l.shared = true; l.charId = c.id; S(dd); render(); uiAlert('已和 ' + c.name + ' 一起管理这个账本', 1600); };
         $('meCsv').onclick = () => { const dd = D(), rows = [['日期', '时间', '类型', '分类', '金额', '账户', '转入账户', '备注']].concat(txs(dd).slice().sort((p, q) => (p.date + (p.time || '')).localeCompare(q.date + (q.time || ''))).map(x => [x.date, x.time || '', x.type === 'out' ? '支出' : x.type === 'in' ? '收入' : '转账', x.type === 'tr' ? '' : catOf(dd, x.type, x.cat).name, x.amt, accOf(dd, x.acc).name, x.type === 'tr' ? accOf(dd, x.to).name : '', x.note || '']));
             const csv = '﻿' + rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n'); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = 'iCost账单_' + T() + '.csv'; document.body.appendChild(a); a.click(); a.remove(); };
         $('meClr').onclick = async () => { if (!(await uiConfirm('清空当前账本里的所有账单吗？不能恢复'))) return; const dd = D(); dd.tx = dd.tx.filter(x => x.lg !== dd.cur); S(dd); render(); };
     }
     function sheet(html) { const app = $('icostApp'), m = document.createElement('div'); m.className = 'xa-mask'; m.innerHTML = '<div class="xa-sheet">' + html + '</div>'; m.addEventListener('mousedown', (e) => { if (e.target === m) m.remove(); }); app.appendChild(m); return m; }
     function ledgerSheet() {
-        const d = D(), m = sheet('<h3>账本</h3><div id="lgL">' + d.ledgers.map(l => '<div class="xa-row" data-l="' + l.id + '" style="cursor:pointer"><b style="font-weight:' + (l.id === d.cur ? 700 : 400) + ';color:var(--text-main)">' + esc(l.name) + (l.id === d.cur ? '（当前）' : '') + '</b><span style="color:var(--text-sub)">' + d.tx.filter(x => x.lg === l.id).length + ' 笔</span></div>').join('') + '</div><div class="xa-btns"><button id="lgNew">＋ 新账本</button><button id="lgRen">重命名当前</button></div><div class="xa-btns"><button class="dan" id="lgDel">删除当前账本</button><button class="pri" id="lgOk">完成</button></div>');
+        const d = D(), m = sheet('<h3>账本</h3><div id="lgL">' + d.ledgers.map(l => '<div class="xa-row" data-l="' + l.id + '" style="cursor:pointer"><b style="font-weight:' + (l.id === d.cur ? 700 : 400) + ';color:var(--text-main)">' + esc(l.name) + (l.shared ? ' · 共同' : '') + (l.id === d.cur ? '（当前）' : '') + '</b><span style="color:var(--text-sub)">' + d.tx.filter(x => x.lg === l.id).length + ' 笔</span></div>').join('') + '</div><div class="xa-btns"><button id="lgNew">＋ 新账本</button><button id="lgRen">重命名当前</button></div><div class="xa-btns"><button class="dan" id="lgDel">删除当前账本</button><button class="pri" id="lgOk">完成</button></div>');
         m.querySelector('#lgOk').onclick = () => m.remove();
         m.querySelectorAll('[data-l]').forEach(e => e.onclick = () => { const dd = D(); dd.cur = e.dataset.l; S(dd); m.remove(); render(); });
-        m.querySelector('#lgNew').onclick = async () => { const n = await uiPrompt('新账本名称（例如：旅行基金、两个人的账本）', ''); if (!n || !n.trim()) return; const dd = D(), id = uid(); dd.ledgers.push({ id: id, name: n.trim().slice(0, 12) }); dd.cur = id; S(dd); m.remove(); render(); };
+        m.querySelector('#lgNew').onclick = async () => { const ac = getChar(getActiveCharId()); const kind = await uiChoose('新建哪种账本？', [{ label: '我一个人的账本', v: 'solo', primary: true }, { label: '和 ' + (ac ? ac.name : 'TA') + ' 一起管理', v: 'duo' }]); if (!kind) return; if (kind === 'duo' && !ac) { uiAlert('先创建并选择一个角色'); return; } const n = await uiPrompt('新账本名称（例如：旅行基金、两个人的账本）', kind === 'duo' ? '我和' + ac.name + '的账本' : ''); if (!n || !n.trim()) return; const dd = D(), id = uid(), l = { id: id, name: n.trim().slice(0, 12) }; if (kind === 'duo') { l.shared = true; l.charId = ac.id; } dd.ledgers.push(l); dd.cur = id; S(dd); m.remove(); render(); };
         m.querySelector('#lgRen').onclick = async () => { const dd = D(), l = dd.ledgers.find(x => x.id === dd.cur); const n = await uiPrompt('账本名称', l.name); if (!n || !n.trim()) return; l.name = n.trim().slice(0, 12); S(dd); m.remove(); render(); };
         m.querySelector('#lgDel').onclick = async () => { const dd = D(); if (dd.ledgers.length < 2) { uiAlert('至少要留一个账本'); return; } const l = dd.ledgers.find(x => x.id === dd.cur); if (!(await uiConfirm('删除账本「' + l.name + '」和里面的所有账单？'))) return; dd.ledgers = dd.ledgers.filter(x => x.id !== dd.cur); dd.tx = dd.tx.filter(x => x.lg !== dd.cur); dd.cur = dd.ledgers[0].id; S(dd); m.remove(); render(); };
     }
@@ -187,7 +254,7 @@
     }
     function addSheet(id) {
         const d = D(), old = id ? d.tx.find(x => x.id === id) : null, app = $('icostApp');
-        let type = old ? old.type : 'out', cat = old ? old.cat : null, accId = old ? old.acc : (d.accounts.some(a => a.id === d.lastAcc) ? d.lastAcc : d.accounts[0].id), to = old ? old.to : null, expr = old ? String(old.amt) : '', date = old ? old.date : T(), note = old ? old.note || '' : '';
+        let type = old ? old.type : 'out', cat = old ? old.cat : null, accId = old ? old.acc : (d.accounts.some(a => a.id === d.lastAcc) ? d.lastAcc : d.accounts[0].id), to = old ? old.to : null, expr = old ? String(old.amt) : '', date = old ? old.date : T(), note = old ? old.note || '' : '', by = old && old.by === 'ta' ? 'ta' : 'me', aa = !!(old && old.aa);
         if (!to) to = (d.accounts.find(a => a.id !== accId) || d.accounts[0]).id;
         const el = document.createElement('div'); el.className = 'ic-add'; app.appendChild(el);
         const pickAcc = async (title, cur) => { const dd = D(); const v = await uiChoose(title, dd.accounts.map(a => ({ label: a.name, v: a.id, primary: a.id === cur }))); return v || cur; };
@@ -196,7 +263,7 @@
             el.innerHTML = '<div class="hd"><button id="adX">取消</button><div class="tp">' + [['out', '支出'], ['in', '收入'], ['tr', '转账']].map(t => '<button data-t="' + t[0] + '" class="' + (type === t[0] ? 'on' : '') + '">' + t[1] + '</button>').join('') + '</div>' + (old ? '<button id="adDel" style="color:#d9534f">删除</button>' : '<span style="width:44px"></span>') + '</div>'
                 + (type === 'tr' ? '<div class="ic-cats" style="grid-template-columns:1fr;padding:30px 20px;text-align:center;color:var(--text-sub);font-size:14px;line-height:2">从「' + esc(accOf(dd, accId).name) + '」转到「' + esc(accOf(dd, to).name) + '」<br><span style="font-size:12px">转账不计入收支，只改变两个账户的余额</span></div>' : '<div class="ic-cats">' + cs.map(c => '<button class="ic-cat' + (c.id === cat ? ' on' : '') + '" data-c="' + c.id + '"><span class="ic-ico" style="background:' + c.color + '">' + svg(c.ic) + '</span>' + esc(c.name) + '</button>').join('') + '</div>')
                 + '<div class="ic-pad"><div class="ic-amt">' + (sel ? '<span class="ic-ico" style="background:' + sel.color + '">' + svg(sel.ic) + '</span>' : '<span class="ic-ico" style="background:#8d94a0">' + svg('swap') + '</span>') + '<input id="adN" placeholder="添加备注…" maxlength="40" value="' + esc(note) + '"><b id="adA">' + (expr || '0') + '</b></div>'
-                + '<div class="ic-chips"><button id="adAcc">' + (type === 'tr' ? '转出：' : '账户：') + esc(accOf(dd, accId).name) + '</button>' + (type === 'tr' ? '<button id="adTo">转入：' + esc(accOf(dd, to).name) + '</button>' : '') + '<label>' + (date === T() ? '今天' : date.slice(5)) + '<input type="date" id="adD" value="' + date + '"></label></div>'
+                + '<div class="ic-chips"><button id="adAcc">' + (type === 'tr' ? '转出：' : '账户：') + esc(accOf(dd, accId).name) + '</button>' + (type === 'tr' ? '<button id="adTo">转入：' + esc(accOf(dd, to).name) + '</button>' : '') + (isShared(dd) && type !== 'tr' ? '<button id="adBy">付款：' + (by === 'ta' ? esc(shName(dd)) : '我') + '</button>' + (type === 'out' ? '<button id="adAA" class="' + (aa ? 'on' : '') + '">AA：' + (aa ? '是' : '否') + '</button>' : '') : '') + '<label>' + (date === T() ? '今天' : date.slice(5)) + '<input type="date" id="adD" value="' + date + '"></label></div>'
                 + '<div class="ic-keys">' + ['7', '8', '9', 'del', '4', '5', '6', '+', '1', '2', '3', 'ok', '-', '0', '.'].map(k => k === 'ok' ? '<button class="ok" data-k="ok">' + (isOp ? '=' : '完成') + '</button>' : '<button data-k="' + k + '" class="' + (k === '+' || k === '-' ? 'op' : '') + '">' + (k === 'del' ? '⌫' : k === '-' ? '−' : k === '+' ? '＋' : k) + '</button>').join('') + '</div></div>';
             el.querySelector('#adX').onclick = () => el.remove();
             el.querySelectorAll('.tp [data-t]').forEach(b => b.onclick = () => { note = el.querySelector('#adN').value; type = b.dataset.t; cat = null; draw(); });
@@ -204,6 +271,8 @@
             if (old) el.querySelector('#adDel').onclick = async () => { if (!(await uiConfirm('删除这笔账单？'))) return; const z = D(); z.tx = z.tx.filter(x => x.id !== id); S(z); el.remove(); render(); };
             el.querySelector('#adAcc').onclick = async () => { note = el.querySelector('#adN').value; accId = await pickAcc(type === 'tr' ? '从哪个账户转出' : '选择账户', accId); draw(); };
             if (type === 'tr') el.querySelector('#adTo').onclick = async () => { note = el.querySelector('#adN').value; to = await pickAcc('转入哪个账户', to); draw(); };
+            if (el.querySelector('#adBy')) el.querySelector('#adBy').onclick = () => { note = el.querySelector('#adN').value; by = by === 'me' ? 'ta' : 'me'; draw(); };
+            if (el.querySelector('#adAA')) el.querySelector('#adAA').onclick = () => { note = el.querySelector('#adN').value; aa = !aa; draw(); };
             el.querySelector('#adD').onchange = (e) => { note = el.querySelector('#adN').value; if (e.target.value) date = e.target.value; draw(); };
             el.querySelector('#adN').oninput = (e) => { note = e.target.value; };
             el.querySelectorAll('.ic-keys [data-k]').forEach(b => b.onclick = () => {
@@ -221,11 +290,22 @@
         function save() {
             const amt = evalExpr(expr); if (!(amt > 0)) { uiAlert('先输入金额'); return; }
             if (type === 'tr' && accId === to) { uiAlert('转出和转入不能是同一个账户'); return; }
-            const dd = D(), o = { type: type, amt: amt, acc: accId, date: date, note: note.trim(), lg: dd.cur }; if (type === 'tr') o.to = to; else o.cat = cat;
-            if (old) { const z = dd.tx.find(x => x.id === id); delete z.cat; delete z.to; Object.assign(z, o); } else dd.tx.push(Object.assign({ id: uid(), time: pad(new Date().getHours()) + ':' + pad(new Date().getMinutes()) }, o));
+            const dd = D(), o = { type: type, amt: amt, acc: accId, date: date, note: note.trim(), lg: dd.cur }; if (type === 'tr') o.to = to; else o.cat = cat; const shr = isShared(dd) && type !== 'tr'; if (shr) { o.by = by; o.aa = type === 'out' && aa; } const newId = old ? id : uid();
+            if (old) { const z = dd.tx.find(x => x.id === id); delete z.cat; delete z.to; Object.assign(z, o); } else dd.tx.push(Object.assign({ id: newId, time: pad(new Date().getHours()) + ':' + pad(new Date().getMinutes()) }, o));
             dd.lastAcc = accId; S(dd); el.remove(); ym = date.slice(0, 7); if (tab !== 'bill' && tab !== 'stat') tab = 'bill'; render(); uiAlert(old ? '已修改' : '记好啦', 1200);
+            if (shr && !old && hasAI()) taReact(newId, o);
         }
         draw();
+    }
+    // 我记一笔后，TA 偶尔会有反应（超预算一定会）：写在那一笔下面，也会让 TA 记得这件事
+    async function taReact(txId, o) {
+        const d = D(); if (!isShared(d)) return; const g = Math.random(); const mm = txs(d).filter(x => x.date.slice(0, 7) === T().slice(0, 7)), out = sum(mm, 'out'), bud = +d.budget[d.cur] || 0, over = bud && out > bud;
+        if (!over && g > 0.65) return;
+        const cat = o.type === 'tr' ? null : catOf(d, o.type, o.cat);
+        const ev = '我刚在账本里记了一笔：' + (o.by === 'ta' ? '你付的' : '我付的') + (o.aa ? '（AA）' : '') + '「' + (cat ? cat.name : '') + '」' + (o.type === 'in' ? '收入 ' : '支出 ') + money(o.amt) + (o.note ? '，备注「' + o.note + '」' : '') + (over ? '。这个月已经超预算了' : '') + '。';
+        const t = await taSay(d, ev); if (!t) return;
+        const dd = D(), z = dd.tx.find(x => x.id === txId); if (!z) return; z.cm = t; S(dd); note2chat(dd, ev + '你当时回应：' + t);
+        const a = $('icostApp'); if (a && !a.classList.contains('hidden')) render(); else try { showBanner(shChar(dd), t); } catch (e) { }
     }
     ensure();
 })();
