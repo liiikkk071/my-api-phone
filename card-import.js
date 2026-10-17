@@ -20,7 +20,17 @@
         system_prompt: '系统提示词', post_history_instructions: '补充指令', creator_notes: '作者备注', notes: '备注', note: '备注', extra: '补充设定',
         rules: '规则', taboo: '禁忌', forbidden: '禁止事项', restrictions: '限制', tags: '标签', character_book: '设定集', lorebook: '设定集', entries: '条目',
         keys: '关键词', content: '内容', comment: '备注', title: '标题', text: '内容', value: '内容',
-        persona: '人设', roleplay: '扮演要求', instructions: '要求', style: '风格', language: '语言'
+        persona: '人设', roleplay: '扮演要求', instructions: '要求', style: '风格', language: '语言',
+        // —— 常见 XML / 分块角色卡的标签 ——
+        occupation_identity: '职业身份', hairstyle_hair_color: '发型发色', hairstyle: '发型', hair_color: '发色', facial_features: '五官', physique: '身材', clothing_style: '穿衣风格', overall_aura: '整体气质', aura: '气质',
+        core_personality: '核心性格', personality_keywords: '性格关键词', hidden_side: '隐藏的一面', upbringing: '成长经历', current_life: '现状', worldbuilding: '世界观', social_background: '社会背景', special_setting: '特殊设定',
+        relationship_with_user: '与user的关系', first_meeting: '初遇', first_impression_of_user: '对user的第一印象', current_view_of_user: '现在怎么看user', hidden_feelings_toward_user: '对user的隐秘心思', shared_experiences_memories: '共同经历',
+        online_chat: '线上聊天', offline_speech: '线下说话', offline_chat: '线下相处', overall_style: '整体风格', overall_tone: '整体语气', text_habits: '打字习惯', usual_forms_of_address: '常用称呼', forms_of_address: '称呼', typing_habits: '发消息习惯', common_expressions: '常用语',
+        emotional_speech_patterns: '情绪下的说话方式', happy: '开心时', angry: '生气时', jealous: '吃醋时', sad: '难过时', truly_furious: '真正暴怒时', shy: '害羞时', anxious: '不安时',
+        preferences_and_skills: '喜好与技能', weaknesses_in_skills: '弱点', family_friends: '家人朋友', other_important_people: '其他重要的人', secrets: '秘密', things_the_character_does_not_easily_tell_others: '不轻易告诉别人的事',
+        character_supplement: '补充设定', values: '价值观', life_goal: '人生目标', boundaries: '底线', emotional_triggers: '情绪触发点', other_details: '其他细节', nsfw: '亲密相关',
+        sexual_experience: '亲密经历', sexual_personality_attitude_orientation: '亲密中的性格与取向', initiative_in_intimacy: '亲密中的主动程度', preferred_positions_places_times_environments: '亲密偏好', arousal_triggers: '心动点', aftercare_and_post_intimacy_habits: '亲密后的习惯', other_nsfw_details: '其他亲密细节',
+        user_info: '关于user', user_setting: '关于user', char_setting: '角色设定', character_setting: '角色设定', character_info: '角色信息', character_profile: '角色档案', dialogue_style: '对话风格', inner_thoughts: '内心想法', daily_life: '日常生活', daily_routine: '日常作息', love_language: '表达爱的方式', attachment_style: '依恋类型'
     };
     const SKIP = { extensions: 1, avatar: 1, spec: 1, spec_version: 1, create_date: 1, creation_date: 1, modification_date: 1, talkativeness: 1, fav: 1, character_version: 1, creator: 1, id: 1, uuid: 1, version: 1, depth: 1, enabled: 1, insertion_order: 1, position: 1, selective: 1, secondary_keys: 1, constant: 1, priority: 1, case_sensitive: 1, use_regex: 1, probability: 1, group: 1 };
     const zh = (k) => { const s = String(k).trim(), l = s.toLowerCase().replace(/[\s-]+/g, '_'); return ZH[l] || ZH[l.replace(/_/g, '')] || (/^[\x00-\x7f]+$/.test(s) ? s.replace(/_/g, ' ') : s); };
@@ -148,6 +158,52 @@
         }).filter(x => x != null).join('\n');
     }
 
+
+    // ---------- XML 标签格式（<character><basic_information><name>…</name>…）→ 分项 ----------
+    function xmlTree(text) {
+        const root = { tag: '', kids: [] }, stack = [root], re = /<(\/?)([A-Za-z_一-龥][\w:.\-一-龥]*)((?:\s[^<>]*)?)(\/?)>/g;
+        let last = 0, m;
+        const addText = (t) => { if (t.trim()) stack[stack.length - 1].kids.push({ text: t }); };
+        while ((m = re.exec(text))) {
+            addText(text.slice(last, m.index)); last = re.lastIndex;
+            if (m[1]) { for (let i = stack.length - 1; i > 0; i--) if (stack[i].tag === m[2]) { stack.length = i; break; } }
+            else if (m[4]) stack[stack.length - 1].kids.push({ tag: m[2], kids: [] });
+            else { const n = { tag: m[2], kids: [] }; stack[stack.length - 1].kids.push(n); stack.push(n); }
+        }
+        addText(text.slice(last));
+        return root;
+    }
+    function xmlFlat(node, path, out) {
+        const els = node.kids.filter(k => k.tag), txt = node.kids.filter(k => !k.tag).map(k => k.text.trim()).filter(Boolean).join('\n');
+        if (txt && path.length) out.push({ g: path.slice(0, -1).join(' · '), t: path[path.length - 1], v: txt, leafText: true });
+        else if (txt) out.push({ g: '', t: '说明', v: txt });
+        els.forEach(ch => {
+            const hasEl = ch.kids.some(k => k.tag), name = zh(ch.tag);
+            if (!hasEl) { const v = ch.kids.map(k => k.text.trim()).filter(Boolean).join('\n'); if (v) out.push({ g: path.join(' · '), t: name, v: v }); }
+            else {
+                const own = ch.kids.filter(k => !k.tag).map(k => k.text.trim()).filter(Boolean).join('\n');
+                const np = path.concat(name);
+                if (own) out.push({ g: np.join(' · '), t: '概述', v: own });
+                const sub = { tag: ch.tag, kids: ch.kids.filter(k => k.tag) };
+                xmlFlat(sub, np, out);
+            }
+        });
+    }
+    function xmlSections(text) {
+        const root = xmlTree(text); let top = root;
+        // 最外层只有一个包装标签（<character>…</character>）：拆开包装，里面的才是分组
+        while (true) {
+            const els = top.kids.filter(k => k.tag), txts = top.kids.filter(k => !k.tag && k.text.trim());
+            if (els.length === 1 && els[0].kids.some(k => k.tag) && txts.every(t => t.text.trim().length < 60)) top = els[0]; else break;
+        }
+        const out = []; xmlFlat(top, [], out);
+        return out.map(x => ({ g: x.g, t: x.t, v: x.v }));
+    }
+    function looksXml(t) {
+        const tags = {}; let n = 0; t.replace(/<([A-Za-z_][\w:.\-]*)(?:\s[^<>]*)?>/g, (m, g) => { if (!tags[g]) { tags[g] = 1; n++; } return m; });
+        return n >= 3 && /<\/[A-Za-z_][\w:.\-]*>/.test(t);
+    }
+
     // ---------- 文字 → 分项 ----------
     const VOCAB = /^(基本信息|基础信息|基本资料|角色信息|人物信息|人设|设定|外貌|外形|外表|性格|性格特点|背景|背景故事|经历|喜好|爱好|说话方式|说话风格|语言风格|关系|人物关系|与我的关系|剧情|世界观|开场白|对话示例|示例|规则|禁忌|注意事项|补充|备注|要求|写作要求|相处模式|称呼|生活习惯|日常|能力|技能)$/;
     function headingOf(l) {
@@ -228,6 +284,7 @@
     function parseAny(text) {
         text = String(text || '').replace(/^﻿/, '');
         const trimmed = text.trim(); if (!trimmed) return [];
+        if (looksXml(trimmed) && !/^[\s`]*\{/.test(trimmed)) { const xs = norm(xmlSections(trimmed)); if (xs.length >= 2) return xs; }
         if (/^[\s`]*[{[]/.test(trimmed) || /```json/i.test(trimmed)) {
             const j = repairJson(trimmed);
             if (j) { const s = jsonSections(j); if (s.length) return norm(s); }

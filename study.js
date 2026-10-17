@@ -14,7 +14,7 @@
     // ---------- 存储 ----------
     function jget(k, d) { try { const v = JSON.parse(store.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
     function jset(k, v) { try { store.setItem(k, JSON.stringify(v)); return true; } catch (e) { uiAlert('保存失败，空间不够了'); return false; } }
-    const DEF = { lang: 'ja', lv: {}, vocab: [], log: {}, talk: {}, cfg: { rate: 0.9, showR: true, showM: true, coRead: true, goal: 20, voice: 'auto', voiceId: '' }, taLine: '' };
+    const DEF = { lang: 'ja', lv: {}, vocab: [], log: {}, talk: {}, cfg: { rate: 0.9, showR: true, showM: true, coRead: true, goal: 20, voice: 'auto', voiceId: '', partner: '' }, taLine: '' };
     function load() { const d = jget(KEY, {}) || {}; return Object.assign({}, DEF, d, { cfg: Object.assign({}, DEF.cfg, d.cfg || {}), vocab: d.vocab || [], log: d.log || {}, talk: d.talk || {}, lv: d.lv || {} }); }
     let D = load(), BK = jget(BKEY, []);
     const save = () => jset(KEY, D), saveBooks = () => jset(BKEY, BK);
@@ -36,7 +36,9 @@
     function logAdd(field, n) { const t = today(); const o = D.log[t] = D.log[t] || { min: 0, words: 0, quiz: 0, ok: 0, read: 0 }; o[field] = (o[field] || 0) + n; save(); }
     function streak() { let n = 0, d = today(); const has = (x) => { const o = D.log[x]; return o && (o.min >= 1 || o.words || o.quiz || o.read); }; if (!has(d)) d = addDays(d, -1); while (has(d)) { n++; d = addDays(d, -1); } return n; }
     const todayMin = () => Math.round(((D.log[today()] || {}).min) || 0);
-    function ta() { const id = getActiveCharId(); return id ? getChar(id) : null; }
+    // 学习搭档：可以单独选一位 char 陪学（不选就跟随当前聊天的角色）
+    function pid() { const p = D.cfg && D.cfg.partner; if (p && getChar(p)) return p; return getActiveCharId(); }
+    function ta() { const id = pid(); return id ? getChar(id) : null; }
     const taName = () => { const c = ta(); return c ? c.name : 'TA'; };
     function spkLang(t) { t = String(t); return /[぀-ヿ]/.test(t) ? 'ja-JP' : /[가-힯]/.test(t) ? 'ko-KR' : /[一-鿿]/.test(t) ? 'zh-CN' : L().tts; }
     function speakBrowser(text, lang, rate) {
@@ -82,7 +84,7 @@
     const FALL = { praise: ['答得很好呀，我都替你开心。', '又进步了一点点，继续保持哦。', '认真的样子很帅 / 很可爱，我都看呆了。'], cheer: ['没关系，错的地方记住了就是赚到。', '慢慢来，我陪着你一起学。', '再来一次，这次一定可以。'], miss: ['今天还没学习呢，来陪我一会儿吧？'] };
     // TA 说话：有 API 就用 TA 自己的口吻，没有就用内置小句子
     async function taSay(task, fb) {
-        const id = getActiveCharId(), c = id ? getChar(id) : null;
+        const id = pid(), c = id ? getChar(id) : null;
         if (!c || !API_KEY) return { c: c, text: fb };
         try { const t = await callPersona(id, task + '\n（只输出你想对我说的话，口语，60字以内，符合你的人设，不要用emoji，不要加引号。）', 1.0); return { c: c, text: oneLine(t) || fb }; } catch (e) { return { c: c, text: fb }; }
     }
@@ -111,8 +113,16 @@
     function renderComp() {
         const box = $('stComp'); if (!box) return; const c = ta(), s = streak();
         const line = FT.on ? '专注中 ' + fmtT(FT.left) + ' · ' + taName() + ' 在陪你' : (D.taLine || (c ? '今天也一起加油吧，我在这儿陪你。' : '先去通讯录创建一个角色，TA 就能陪你学习啦'));
-        box.innerHTML = '<div class="st-comp" id="stCompCard"><span class="avatar-small">' + (c ? charAvatarInner(c) : '(๑•̀ㅂ•́)') + '</span><div class="st-cl"><b>' + esc(taName()) + ' 陪你学习</b><p>' + esc(line) + '</p></div><div class="st-cs"><b>' + s + '</b><small>连续天数</small></div><div class="st-cs"><b>' + todayMin() + '</b><small>今日分钟</small></div></div>';
+        box.innerHTML = '<div class="st-comp" id="stCompCard"><span class="avatar-small">' + (c ? charAvatarInner(c) : '(๑•̀ㅂ•́)') + '</span><div class="st-cl"><b>' + esc(taName()) + ' 陪你学习 <i class="st-swap" id="stSwap">换人 ⇄</i></b><p>' + esc(line) + '</p></div><div class="st-cs"><b>' + s + '</b><small>连续天数</small></div><div class="st-cs"><b>' + todayMin() + '</b><small>今日分钟</small></div></div>';
+        $('stSwap').onclick = (e) => { e.stopPropagation(); pickPartner(); };
         $('stCompCard').onclick = async () => { if (busy) return; busy = true; const r = await taSay('我正在学习，随便说一句鼓励/陪伴我的话（可以撒点娇或调侃，贴合我们现在的关系）。', pick(FALL.cheer)); busy = false; setTaLine(r.text); };
+    }
+    function pickPartner() {
+        const chars = getChars(); if (!chars.length) { uiAlert('先去通讯录创建一个角色'); return; }
+        const cur = D.cfg.partner || '';
+        const m = sheet('<h3>选谁陪你学习</h3><div class="st-pl"><div class="st-po' + (cur ? '' : ' on') + '" data-c=""><span class="avatar-small">(๑•̀ㅂ•́)</span><div><b>跟随当前聊天的角色</b><small>现在是 ' + esc((function () { const x = getActiveCharId() && getChar(getActiveCharId()); return x ? x.name : '未选择'; })()) + '</small></div></div>'
+            + chars.map(c => '<div class="st-po' + (cur === c.id ? ' on' : '') + '" data-c="' + esc(c.id) + '"><span class="avatar-small">' + charAvatarInner(c) + '</span><div><b>' + esc(c.name) + '</b><small>' + esc(String((c.card && c.card.Role) || '').slice(0, 20) || '点一下选 TA') + '</small></div></div>').join('') + '</div><p style="font-size:12px;color:var(--text-sub);line-height:1.6;margin:8px 4px 0">选定后，朗读、对话陪练、点评、一起阅读时的感想都由 TA 来说，不会影响你在微信里正在聊的角色。每个搭档的对话陪练记录是分开的。</p>');
+        m.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { D.cfg.partner = b.dataset.c; D.taLine = ''; save(); m.remove(); shell(); uiAlert(b.dataset.c ? '现在由 ' + ((getChar(b.dataset.c) || {}).name || 'TA') + ' 陪你学习' : '已改为跟随当前聊天的角色'); });
     }
     const fmtT = (s) => { s = Math.max(0, Math.round(s)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
     function renderMain() {
@@ -201,7 +211,7 @@
             else if (a === 'add') { if (addVocab(p)) { b.textContent = '✓'; logAdd('words', 1); renderComp(); } else uiAlert('已经在单词本里啦', 1200); }
             else if (a === 'ta') {
                 if (needApi() || busy) return; busy = true; out.innerHTML = '<p class="st-note">TA 在组织语言…</p>';
-                try { const t = await callPersona(getActiveCharId(), '请用' + L().name + '对我说一句包含或模仿「' + p.w + '」的话，贴合你的人设和我们现在的关系，要自然、有感情。只输出JSON：{"t":"' + L().name + '原文","r":"读音","m":"中文意思","say":"你想补充的一句中文话（可空）"}', 1.0); const j = parseJSONLoose(t); if (!j || !j.t) throw new Error('没有识别到内容'); out.innerHTML = '<div class="st-tab"><b>' + esc(j.t) + '</b> <button data-a="again">♪</button><div class="st-r">' + esc(j.r || '') + '</div><div>' + esc(j.m || '') + '</div>' + (j.say ? '<div class="st-n">' + esc(taName()) + '：' + esc(j.say) + '</div>' : '') + '</div>'; out.querySelector('[data-a="again"]').onclick = (ev) => { ev.stopPropagation(); speak(j.t, L().tts); }; speak(j.t, L().tts); }
+                try { const t = await callPersona(pid(), '请用' + L().name + '对我说一句包含或模仿「' + p.w + '」的话，贴合你的人设和我们现在的关系，要自然、有感情。只输出JSON：{"t":"' + L().name + '原文","r":"读音","m":"中文意思","say":"你想补充的一句中文话（可空）"}', 1.0); const j = parseJSONLoose(t); if (!j || !j.t) throw new Error('没有识别到内容'); out.innerHTML = '<div class="st-tab"><b>' + esc(j.t) + '</b> <button data-a="again">♪</button><div class="st-r">' + esc(j.r || '') + '</div><div>' + esc(j.m || '') + '</div>' + (j.say ? '<div class="st-n">' + esc(taName()) + '：' + esc(j.say) + '</div>' : '') + '</div>'; out.querySelector('[data-a="again"]').onclick = (ev) => { ev.stopPropagation(); speak(j.t, L().tts); }; speak(j.t, L().tts); }
                 catch (er) { out.innerHTML = '<p class="st-note">没成功：' + esc(er.message) + '</p>'; }
                 busy = false;
             }
@@ -247,7 +257,7 @@
             else if (a === 'add') { if (addVocab(it)) { b.textContent = '✓'; logAdd('words', 1); renderComp(); } else uiAlert('已经在单词本里啦', 1200); }
             else if (a === 'ta') {
                 if (needApi() || busy) return; busy = true; out.innerHTML = '<p class="st-note">TA 在想怎么说…</p>';
-                try { const t = await callPersona(getActiveCharId(), '请用' + L().name + '说一句话对我说，必须用到「' + it.w + '」，要贴合你的人设和我们的关系，像真人聊天。只输出JSON：{"t":"原文","r":"读音","m":"中文意思","say":"你再用中文补一句（可空）"}', 1.0); const j = parseJSONLoose(t); if (!j || !j.t) throw new Error('没有识别到内容'); out.innerHTML = '<div class="st-tab"><b>' + esc(j.t) + '</b> <button data-a="again">♪</button><div class="st-r">' + esc(j.r || '') + '</div><div>' + esc(j.m || '') + '</div>' + (j.say ? '<div class="st-n">' + esc(taName()) + '：' + esc(j.say) + '</div>' : '') + '</div>'; out.querySelector('[data-a="again"]').onclick = (ev) => { ev.stopPropagation(); speak(j.t, L().tts); }; speak(j.t, L().tts); }
+                try { const t = await callPersona(pid(), '请用' + L().name + '说一句话对我说，必须用到「' + it.w + '」，要贴合你的人设和我们的关系，像真人聊天。只输出JSON：{"t":"原文","r":"读音","m":"中文意思","say":"你再用中文补一句（可空）"}', 1.0); const j = parseJSONLoose(t); if (!j || !j.t) throw new Error('没有识别到内容'); out.innerHTML = '<div class="st-tab"><b>' + esc(j.t) + '</b> <button data-a="again">♪</button><div class="st-r">' + esc(j.r || '') + '</div><div>' + esc(j.m || '') + '</div>' + (j.say ? '<div class="st-n">' + esc(taName()) + '：' + esc(j.say) + '</div>' : '') + '</div>'; out.querySelector('[data-a="again"]').onclick = (ev) => { ev.stopPropagation(); speak(j.t, L().tts); }; speak(j.t, L().tts); }
                 catch (er) { out.innerHTML = '<p class="st-note">没成功：' + esc(er.message) + '</p>'; }
                 busy = false;
             }
@@ -278,7 +288,7 @@
         m.querySelectorAll('.st-ex [data-a="exsay"]').forEach(b => b.onclick = () => speak(gram.examples[+b.closest('.st-ex').dataset.i].t, L().tts));
         if ($('stGTa')) $('stGTa').onclick = async () => {
             if (needApi() || busy) return; busy = true; $('stGOut').innerHTML = '<p class="st-note">TA 在想…</p>';
-            try { const t = await callPersona(getActiveCharId(), '我正在学「' + gram.title + '」。请你用这个语法，用' + L().name + '对我说一句话，贴合你的人设和我们的关系，然后用中文告诉我这句里用到了它的哪里。只输出JSON：{"t":"原文","r":"读音","m":"中文意思","note":"你的讲解（口语，40字内）"}', 1.0); const j = parseJSONLoose(t); if (!j || !j.t) throw new Error('没有识别到内容'); $('stGOut').innerHTML = '<div class="st-tab"><b>' + esc(j.t) + '</b> <button id="stGAg">♪</button><div class="st-r">' + esc(j.r || '') + '</div><div>' + esc(j.m || '') + '</div><div class="st-n">' + esc(taName()) + '：' + esc(j.note || '') + '</div></div>'; $('stGAg').onclick = () => speak(j.t, L().tts); speak(j.t, L().tts); }
+            try { const t = await callPersona(pid(), '我正在学「' + gram.title + '」。请你用这个语法，用' + L().name + '对我说一句话，贴合你的人设和我们的关系，然后用中文告诉我这句里用到了它的哪里。只输出JSON：{"t":"原文","r":"读音","m":"中文意思","note":"你的讲解（口语，40字内）"}', 1.0); const j = parseJSONLoose(t); if (!j || !j.t) throw new Error('没有识别到内容'); $('stGOut').innerHTML = '<div class="st-tab"><b>' + esc(j.t) + '</b> <button id="stGAg">♪</button><div class="st-r">' + esc(j.r || '') + '</div><div>' + esc(j.m || '') + '</div><div class="st-n">' + esc(taName()) + '：' + esc(j.note || '') + '</div></div>'; $('stGAg').onclick = () => speak(j.t, L().tts); speak(j.t, L().tts); }
             catch (er) { $('stGOut').innerHTML = '<p class="st-note">没成功：' + esc(er.message) + '</p>'; }
             busy = false;
         };
@@ -345,7 +355,7 @@
 
     // ---------- 对话陪练 ----------
     const SCENES = ['自由聊天', '自我介绍', '点餐 / 咖啡店', '约会', '旅行问路', '购物', '安慰与鼓励', '睡前聊天'];
-    function talkKey() { return D.lang + '_' + (getActiveCharId() || '_'); }
+    function talkKey() { return D.lang + '_' + (pid() || '_'); }
     function subTalk(m) {
         if (!ta()) { m.innerHTML = backBar('对话陪练') + '<div class="xa-empty">先去通讯录创建一个角色，TA 才能陪你练习～</div>'; onBack(goLearn); return; }
         const arr = D.talk[talkKey()] || [];

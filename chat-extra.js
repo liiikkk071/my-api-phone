@@ -4,6 +4,7 @@
     var QRE = /^\s*[\[［【]\s*引用\s*[:：]\s*([^\]］】]{1,80}?)\s*[\]］】]\s*([\s\S]+)$/;
     var IRE = /^\s*[\[［【]\s*图片\s*[:：]\s*([^\]］】]{2,200}?)\s*[\]］】]\s*$/;
     var RRE = /^\s*[\[［【]\s*撤回\s*[\]］】]\s*$/;
+    var VRE = /^\s*[\[［【]\s*(?:语音|语音消息|voice)\s*[:：]\s*([\s\S]{1,400}?)\s*[\]］】]\s*$/i;
     var pendingQuote = null;
     var busy = {};
 
@@ -56,6 +57,36 @@
         b.insertAdjacentElement('afterend', d);
     }
 
+
+    // ---------- 线上聊天：去掉括号 / 星号里的动作描写（线上只有对话） ----------
+    var HAN = /[一-龥]/g;
+    function hasText(x) { var m = String(x).match(HAN); return !!m && m.length >= 1; }
+    // 括号里有汉字 = 动作/神态/心理描写，删掉；纯颜文字 (๑>ᴗ<๑) 这类没有汉字，保留
+    function stripActions(t, keepOpen) {
+        t = String(t == null ? '' : t);
+        if (!t) return t;
+        var o = t
+            .replace(/（[^（）\n]*）/g, function (m) { return hasText(m) ? '' : m; })
+            .replace(/\([^()\n]*\)/g, function (m) { return hasText(m) ? '' : m; })
+            .replace(/［[^［］\n]*］/g, function (m) { return /^［\s*(引用|图片|语音|撤回|表情包)/.test(m) ? m : (hasText(m) ? '' : m); })
+            .replace(/\*[^*\n]{1,80}\*/g, function (m) { return hasText(m) ? '' : m; })
+            .replace(/＊[^＊\n]{1,80}＊/g, function (m) { return hasText(m) ? '' : m; });
+        // 流式输出时括号还没写完：先藏起来，免得动作闪一下
+        o = o.replace(/[（(][^）)\n]*$/, function (m) { return hasText(m) || m.length <= 1 ? '' : m; });
+        o = o.replace(/\*[^*\n]*$/, function (m) { return hasText(m) ? '' : m; });
+        // 清理删除后留下的多余空格/标点
+        o = o.replace(/[ \t]{2,}/g, ' ').replace(/^[ \t，,、]+/gm, '').replace(/[ \t]+$/gm, '');
+        return o;
+    }
+    function voiceText(seg) { var m = VRE.exec(String(seg)); return m ? m[1].trim() : null; }
+    function isLatin(t) { var a = (String(t).match(/[A-Za-z]/g) || []).length, h = (String(t).match(HAN) || []).length; return a > 3 && a > h * 2; }
+    function playVoice(text, charId) {
+        if (typeof window.ttsSpeak !== 'function') { uiAlert('语音模块没有加载'); return; }
+        var lang = isLatin(text) ? 'en-US' : /[぀-ヿ]/.test(text) ? 'ja-JP' : 'zh-CN';
+        var off = (window.ttsProvider && window.ttsProvider()) === 'off';
+        window.ttsSpeak(text, charId || null, { force: true, provider: off ? 'browser' : undefined, lang: lang, silent: false });
+    }
+
     // ---------- 角色输出的特殊标记 ----------
     function splitQuote(seg, charId) {
         var m = QRE.exec(String(seg)); if (!m) return null;
@@ -76,6 +107,7 @@
         var m = QRE.exec(t); if (m) return m[2];
         if (/^\s*[\[［【]\s*引用[^\]］】]*$/.test(t)) return '…';
         var g = imgTag(t); if (g) return '(◕ᴗ◕) 正在拍照…';
+        if (voiceText(t) !== null || /^\s*[\[［【]\s*(语音|voice)/i.test(t)) return '(◕ᴗ◕) 正在录语音…';
         if (/^\s*[\[［【]\s*(图片|撤回)[^\]］】]*$/.test(t)) return '…';
         return t;
     }
@@ -158,7 +190,7 @@
     // ---------- 提示词 ----------
     function hint() {
         var auto = sget('imgGenAuto', '1') !== '0';
-        return '\n【聊天小功能】\n1. 引用：想回应我之前说的某句话时，这条消息写成 [引用:我说过的原话片段]你的回复，片段要简短，偶尔用。\n2. 撤回：如果你说错话、说了害羞的话想收回，可以单独一行写 [撤回]，你上一条消息就会被撤回（别滥用）。我撤回消息时你会看到「（我撤回了一条消息…）」，可以好奇、调侃，也可以装作没看见。\n3. 发照片：' + (auto ? '我想看你的照片/自拍/风景，或情境很合适时，' : '只有我明确要看照片时，') + '单独一行写 [图片:照片内容的详细画面描述]（描述要具体：人物、动作、场景、光线），再另起一行说句话。我发的照片你直接按描述理解。';
+        return '\n【聊天小功能】\n1. 引用：想回应我之前说的某句话时，这条消息写成 [引用:我说过的原话片段]你的回复，片段要简短，偶尔用。\n2. 撤回：如果你说错话、说了害羞的话想收回，可以单独一行写 [撤回]，你上一条消息就会被撤回（别滥用）。我撤回消息时你会看到「（我撤回了一条消息…）」，可以好奇、调侃，也可以装作没看见。\n3. 发照片：' + (auto ? '我想看你的照片/自拍/风景，或情境很合适时，' : '只有我明确要看照片时，') + '单独一行写 [图片:照片内容的详细画面描述]（描述要具体：人物、动作、场景、光线），再另起一行说句话。我发的照片你直接按描述理解。\n4. 发语音：你完全可以发语音。当我说「发语音/说句话给我听/给我发一句语音/念给我听」，或你自己想用声音表达时，单独一行写 [语音:你要说的那句话]，方括号里就是你说的原话（我要求用英语/日语等外语就直接写外语原文，不要加翻译和括号说明）。系统会把它显示成语音条，我点一下就能听。只要我提出要语音，就要发，不能说「语音坏了/发不了」；如果你的性格别扭，也要用符合性格的方式照做（可以嘴硬一句，再把语音发出来）。语音里只放要说的话，不要放动作描写。';
     }
 
     // ---------- TA 拍照 ----------
@@ -229,7 +261,7 @@
         });
     }
 
-    window.ChatX = { splitQuote: splitQuote, imgTag: imgTag, isRecall: isRecall, live: live, recallLastAi: recallLastAi, addQuote: addQuote, takeQuote: takeQuote, clearQuote: clearQuote, genHtml: genHtml, imgFail: imgFail, recalledRow: recalledRow, sheet: sheet, hint: hint, askPhoto: askPhoto, afterReply: afterReply, briefOf: briefOf };
+    window.ChatX = { stripActions: stripActions, voiceText: voiceText, playVoice: playVoice, splitQuote: splitQuote, imgTag: imgTag, isRecall: isRecall, live: live, recallLastAi: recallLastAi, addQuote: addQuote, takeQuote: takeQuote, clearQuote: clearQuote, genHtml: genHtml, imgFail: imgFail, recalledRow: recalledRow, sheet: sheet, hint: hint, askPhoto: askPhoto, afterReply: afterReply, briefOf: briefOf };
     window.chatxHint = hint;
     bar(); bindSettings();
 })();

@@ -1759,3 +1759,6 @@ html[data-theme=cream] .section-title,html[data-theme=cream] .hint-line{font-fam
 
 html,body{overscroll-behavior-x:none}
 .fo-mini svg{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round}
+
+.album-icon{background:linear-gradient(145deg,#9fd8f2,#5fa8e0)}
+#desktop.ic-sweet .album-icon{--c1:#cfeaf8;--c2:#86bfe9}

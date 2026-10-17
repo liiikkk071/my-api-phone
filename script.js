@@ -55,7 +55,8 @@ function readImageCompressed(file, cb, maxSize) {
                 canvas.width = Math.max(1, Math.round(img.width * scale));
                 canvas.height = Math.max(1, Math.round(img.height * scale));
                 canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-                cb(canvas.toDataURL('image/jpeg', 0.85));
+                if (/png|webp|gif/i.test(file.type || '')) { let u = canvas.toDataURL('image/webp', 0.88); if (u.indexOf('image/webp') < 0) u = canvas.toDataURL('image/png'); cb(u); } // 透明图片保留透明，不再变成黑底
+                else cb(canvas.toDataURL('image/jpeg', 0.85));
             } catch (err) { cb(raw); }
         };
         img.onerror = () => cb(raw);
@@ -283,6 +284,45 @@ function textOn(hex) {
     const lum = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
     return lum > 0.62 ? '#2d2d2d' : '#ffffff';
 }
+
+// ---- 气泡文字自动保证看得清：按「气泡颜色 + 聊天背景」算出真实底色，对比度不够就自动换成深色/浅色字 ----
+const _bgAvg = {};
+function _rgbOf(str) { const m = /rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:[ ,/]+([\d.]+))?/.exec(String(str || '')); if (m) return [+m[1], +m[2], +m[3], m[4] == null ? 1 : +m[4]]; const h = /^#([0-9a-f]{6})$/i.exec(String(str || '').trim()); if (h) { const n = parseInt(h[1], 16); return [n >> 16, (n >> 8) & 255, n & 255, 1]; } return null; }
+function _resolveColor(css) { try { const t = document.createElement('i'); t.style.cssText = 'position:absolute;visibility:hidden;color:' + css; document.body.appendChild(t); const c = getComputedStyle(t).color; t.remove(); return _rgbOf(c); } catch (e) { return null; } }
+function _relLum(c) { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); }
+function _contrast(a, b) { const x = _relLum(a), y = _relLum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+function _mix(a, b, p) { return [0, 1, 2].map(i => a[i] * (1 - p) + b[i] * p); }
+function _chatBgColor() {
+    const o = chatOwner && chatOwner(), v = (o && o.bg) || store.getItem('chatBgAll') || '', dim = (parseInt(store.getItem('chatBgDim') || '0', 10) || 0) / 100;
+    let c = null;
+    if (v) {
+        const pr = CHAT_BG_PRESETS.find(x => x[0] === v);
+        if (pr) { const hs = pr[1].match(/#[0-9a-f]{6}/gi) || []; if (hs.length) { const cs = hs.map(_rgbOf); c = [0, 1, 2].map(i => cs.reduce((a, x) => a + x[i], 0) / cs.length); } }
+        else if (_bgAvg[v]) c = _bgAvg[v];
+        else if (_bgAvg[v] === undefined) { _bgAvg[v] = null; const im = new Image(); im.onload = () => { try { const cv = document.createElement('canvas'); cv.width = cv.height = 12; const x = cv.getContext('2d'); x.drawImage(im, 0, 0, 12, 12); const d = x.getImageData(0, 0, 12, 12).data; let r = 0, g = 0, b = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; } const n = d.length / 4; _bgAvg[v] = [r / n, g / n, b / n]; fixBubbleContrast(); } catch (e) { } }; im.src = v; }
+        if (!c) c = [128, 128, 128];
+        if (dim > 0) c = c.map(x => x * (1 - dim));
+        return c;
+    }
+    return _resolveColor('var(--chat-bg, var(--bg-color))') || _resolveColor('var(--bg-color)') || [240, 240, 243];
+}
+function fixBubbleContrast() {
+    try {
+        const root = document.documentElement.style, app = $('chatRoomApp'), glass = !!(app && app.classList.contains('chat-ios'));
+        const bg = _chatBgColor(), dark = [28, 28, 30], light = [255, 255, 255];
+        const pick = (base, tr, curText) => {
+            const eff = glass ? _mix(base, bg, tr) : base, cur = _rgbOf(curText) || dark;
+            const worst = (t) => Math.min(_contrast(t, eff), glass ? _contrast(t, base) : 99);
+            if (worst(cur) >= 4.6) return null;
+            return worst(dark) >= worst(light) ? '#1c1c1e' : '#ffffff';
+        };
+        const ui = getUI(), my = _resolveColor('var(--my-bubble)'), ai = _resolveColor('var(--ai-bubble)');
+        const myDef = textOn(ui.myBubble || accentColor()), aiDef = ui.aiBubble ? textOn(ui.aiBubble) : getComputedStyle(document.documentElement).getPropertyValue('--theme-dark');
+        const myTxt = (my && pick(my, 0.3, myDef)) || myDef, aiTxt = ai && pick(ai, 0.45, aiDef);
+        root.setProperty('--my-bubble-text', myTxt);
+        if (aiTxt) root.setProperty('--ai-bubble-text', aiTxt); else if (ui.aiBubble) root.setProperty('--ai-bubble-text', aiDef); else root.removeProperty('--ai-bubble-text');
+    } catch (e) { }
+}
 function accentColor() { return store.getItem('themeColor') || THEMES.monodark; }
 
 function applyUI() {
@@ -307,6 +347,7 @@ function applyUI() {
         r.setProperty('--wallpaper', ui.wallpaper === 'wp0' && tm === 'cream' ? CREAM_WP : ui.wallpaper === 'wp0' && tm === 'mono' ? MONO_WP : ui.wallpaper === 'wp0' && tm === 'monodark' ? RAIN_WP : wp.css);
     }
     const dkEl = document.getElementById('desktop'); if (dkEl) dkEl.classList.toggle('wp-default', ui.wallpaper === 'wp0' && !/^(mono|cream)/.test(store.getItem('themeMode') || ''));
+    try { fixBubbleContrast(); } catch (e) {}
 }
 
 let uiControlsBound = false;
@@ -567,13 +608,14 @@ function genderTail(char) {
     const me = myGenderInfo(), ch = charGenderInfo(char);
     return '\n【称呼提醒】我是' + (me.g || '（性别未说明）') + '，提到我只用「' + (me.p === 'TA' ? 'TA' : me.p) + '」' + (me.p === 'TA' ? '' : '，不要用' + (me.p === '她' ? '「他」' : '「她」')) + '。' + (ch.g ? '你是' + ch.g + '生，提到你自己是「' + ch.p + '」。' : '') + '其他人按各自性别用「他/她」，不要混。';
 }
-function buildCharacterCard(char) {
+function buildCharacterCard(char, scene) {
     let characterCard = "你是一个住在手机里的AI助手，说话自然、简短。";
     if (char && char.card && char.card.sections && char.card.sections.length) {
         const c = char.card, nm = c.Name || char.name || '角色';
         const parts = ['你叫' + nm + '。以下是你的完整设定，请逐条遵守：'];
         let lastG = null;
-        c.sections.forEach(x => { if (x.g && x.g !== lastG) { parts.push('\n【' + x.g + '】'); } lastG = x.g; parts.push((x.t ? x.t + '：' : '') + x.v); });
+        const skip = (x) => { const k = (x.g || '') + ' ' + (x.t || ''); return scene === 'online' ? /线下|offline/i.test(k) : scene === 'offline' ? /线上|online|打字|typing/i.test(k) : false; };
+        c.sections.filter(x => !skip(x)).forEach(x => { if (x.g && x.g !== lastG) { parts.push('\n【' + x.g + '】'); } lastG = x.g; parts.push((x.t ? x.t + '：' : '') + x.v); });
         characterCard = parts.join('\n') + '\n\n请严格以这个角色的身份、性格和说话方式与我聊天。设定里如果写了互动规则、禁止事项、切换条件，必须照做。可以使用颜文字，但不要用emoji。';
     } else if (char && char.card && char.card.Name) {
         const c = char.card;
@@ -844,6 +886,17 @@ function mergeSameRole(arr) {
     });
     return out;
 }
+const ONLINE_RULES = '\n\n【线上聊天格式（最高优先级）】你现在是隔着手机打字聊天，线上只有「说出口的话」：严禁任何动作、神态、心理、环境描写，严禁用括号（）()、星号*、方括号【】包起来的旁白，例如（笑）（摸摸你的头）*叹气* 全都不许出现；想表达动作或情绪就直接用说话的语气、语气词、颜文字、表情包来表现。只有颜文字本身可以带括号。';
+// 人设优先：把角色卡里关于「说话方式」的条目在提示词最后再强调一遍，避免被通用规则冲淡
+function personaTail(char) {
+    try {
+        const secs = (char && char.card && char.card.sections) || [];
+        const hit = secs.filter(x => /说话|语气|口头禅|聊天|称呼|打字|表达|情绪|speech|chat|typing|tone/i.test((x.g || '') + (x.t || '')) && !/线下|offline/i.test((x.g || '') + (x.t || '')));
+        let t = '\n\n【人设优先】上面所有通用的说话要求（简短、口语化、少追问等），一旦和你的角色设定冲突——比如设定里你话很多/很黏人/爱用颜表情/有固定称呼和口头禅/性格强势或别扭——一律以角色设定为准，不要被写成千篇一律的「乖巧AI」。你的每一句话都要看得出是这个角色，而不是随便哪个人。';
+        if (hit.length) t += '\n再次强调你线上聊天的说话方式：\n' + hit.slice(0, 10).map(x => (x.t ? x.t + '：' : '') + String(x.v).slice(0, 360)).join('\n');
+        return t;
+    } catch (e) { return ''; }
+}
 const OFFLINE_RULES = '\n\n【线下模式】现在不是隔着手机聊天，而是我们面对面在同一个场景里。请用小说式的叙述来回复：描写你的动作、神态、语气、周围环境和内心感受，对白用「」括起来，动作和神态直接写成叙述句，不要用星号*或括号包裹；用第一人称「我」写你自己，称呼我为「你」；每次写一到数段，约150~350字，节奏自然，不要像发微信那样拆成很多短句，也不要用表情包和颜文字；保持你的人设和我们已有的关系；不要替我做决定、不要替我说话，只写你这边发生的事，把空间留给我继续回应；场景要符合当前时间和我们已知的情况，不要编造我没说过的事实。';
 function isOffline(c) { return !!(c && c.offline); }
 function syncOfflineUI() {
@@ -881,13 +934,15 @@ function buildChatMessages(userMessage, useHistory, charId, opts) {
     opts = opts || {};
     const id = charId || getActiveCharId();
     const char = id ? getChar(id) : null;
-    let systemContent = buildCharacterCard(char);
-    const off = isOffline(char), scene = off ? 'offline' : 'online', wctx = recentCtx(char, userMessage);
+    const off = isOffline(char), scene = off ? 'offline' : 'online';
+    let systemContent = buildCharacterCard(char, scene);
+    const wctx = recentCtx(char, userMessage);
     const worldbook = worldPromptFor(worldIdsOfChar(char), wctx, scene);
     if (worldbook) systemContent += '\n\n【世界书设定】：\n' + worldbook;
     if (char) systemContent += contextTail(char) + (off ? '' : stickerHint() + (window.chatxHint ? window.chatxHint() : ''));
     if (off) systemContent += OFFLINE_RULES;
     else if (opts.chat && getBool('chatSplit', true)) systemContent += SPLIT_HINT;
+    if (!off) systemContent += ONLINE_RULES + personaTail(char);
     let msgs = [];
     if (useHistory && char) {
         let hist = (char.chatHistory || []).filter(m => m.role === 'user' || m.role === 'assistant');
@@ -959,6 +1014,13 @@ async function chatReply(charId, prompt, opts) {
     opts = opts || {};
     const split = getBool('chatSplit', true) && !isOffline(getChar(charId)), stream = getBool('chatStream', true);
     const here = () => charId === currentChatCharId && !currentGroupId;
+    // 线上聊天：去掉括号/星号动作描写；[语音:...] 单独成行
+    const segsOf = (t) => {
+        if (isOffline(getChar(charId))) return splitSegments(t, split);
+        let x = String(t == null ? '' : t).replace(/([\[［【]\s*(?:语音|voice)\s*[:：][^\]］】\n]*[\]］】])/gi, '\n$1\n');
+        if (window.ChatX) x = ChatX.stripActions(x);
+        return splitSegments(x, split || /[\[［【]\s*(?:语音|voice)/i.test(x));
+    };
     const controller = new AbortController();
     currentAbort = controller; setSendBusy(true);
     const aiOpts = { chat: true, signal: controller.signal, image: opts.image || null, quote: opts.quote || null };
@@ -971,7 +1033,9 @@ async function chatReply(charId, prompt, opts) {
     const histMsg = (seg) => {
         const X = window.ChatX, qm = X ? X.splitQuote(seg, charId) : null, body = qm ? qm.text : seg, gm = X ? X.imgTag(body) : null;
         let o;
-        if (gm) { o = { role: 'assistant', content: '[图片:' + gm + ']', gen: gm }; needRender = true; }
+        const vt = X ? X.voiceText(body) : null;
+        if (vt) { o = { role: 'assistant', content: '[语音消息]' + vt }; needRender = true; }
+        else if (gm) { o = { role: 'assistant', content: '[图片:' + gm + ']', gen: gm }; needRender = true; }
         else { const st = stickerOf(body); if (!st) o = { role: 'assistant', content: body }; else { o = { role: 'assistant', content: '[表情包:' + st.name + ']' }; if (st.face) o.face = st.face; else o.img = st.data; } }
         if (qm) { o.quote = qm.quote; needRender = true; }
         return o;
@@ -998,17 +1062,17 @@ async function chatReply(charId, prompt, opts) {
             await askAIStream(prompt, true, charId, aiOpts, (d) => {
                 full += d;
                 if (!here() || (bubbles[0] && !bubbles[0].isConnected)) return;
-                const segs = splitSegments(full, split);
+                const segs = segsOf(full);
                 if (!segs.length) return;
                 segs.forEach((t, i) => { const el = ensureBubble(i, t); setText(el, t); });
                 const cb = document.getElementById('chatBox'); if (cb) cb.scrollTop = cb.scrollHeight;
             });
-            const segs = splitSegments(full, split);
+            const segs = segsOf(full);
             if (!segs.length) throw new Error('没有收到回复');
             finish(segs); ok = true;
         } else {
             const reply = await askAI(prompt, true, charId, aiOpts);
-            const segs = splitSegments(reply, split);
+            const segs = segsOf(reply);
             if (!segs.length) throw new Error('没有收到回复');
             for (let i = 0; i < segs.length; i++) {
                 if (i > 0) await sleep(450 + Math.min(1200, segs[i].length * 30));
@@ -1021,7 +1085,7 @@ async function chatReply(charId, prompt, opts) {
             ok = true;
         }
     } catch (error) {
-        const partial = splitSegments(full, split);
+        const partial = segsOf(full);
         if (stream && partial.length && !ok) { finish(partial); ok = true; }
         else if (!(error && error.name === 'AbortError')) {
             bubbles.forEach(el => el.remove());
@@ -1051,6 +1115,7 @@ function histCardHtml(m) {
     return null;
 }
 function toggleVoiceText(el) {
+    try { if (el.closest('.ai-message') && window.ChatX) ChatX.playVoice(el.getAttribute('data-text') || '', currentGroupId ? null : currentChatCharId); } catch (e) {}
     const old = el.parentElement.querySelector('.voice-text');
     if (old) { old.remove(); return; }
     const t = document.createElement('div');
@@ -2537,6 +2602,7 @@ async function groupReply(gid, nudge) {
         if (typing) typing.remove();
         const g = getGroup(gid); const byId = {}; groupMembersOf(g).forEach(m => { byId[m.id] = m; });
         for (const l of lines) {
+            if (window.ChatX) { l.text = ChatX.stripActions(l.text).trim(); if (!l.text) continue; }
             pushGroupHistory(gid, { role: 'assistant', speakerId: l.charId, speaker: l.name, content: l.text });
             if (currentGroupId === gid) { const gel = appendMessage(l.text, 'ai-message', byId[l.charId] ? charAvatarInner(byId[l.charId]) : escapeHtml(AI_KAO), false, l.name); if (gel) gel.dataset.idx = (getGroup(gid).chatHistory || []).length - 1; await sleep(450 + Math.min(1400, l.text.length * 35)); }
         }
@@ -2723,6 +2789,7 @@ function contextTail(c) {
     if (act) t += '\n【最近发生的事（读法：「我」=用户，「你」=你自己；方括号里写明了谁对谁做的，不要搞反）】\n' + act;
     try { t += lifeContext(c); } catch (e) {}
     try { t += peekContext(c); } catch (e) {}
+    try { if (window.albumContext) t += window.albumContext(c); } catch (e) {}
     try { const vm = visibleMomentsText(c); if (vm) t += '\n【我最近发的朋友圈（你能看到）】\n' + vm + '\n（如果自然，可以聊到；你看不到的内容不要说出来）'; } catch (e) {}
     try { t += genderTail(c); } catch (e) {}
     try { if (String(store.getItem('liveOn') || '1') !== '0') t += varietySeed(); } catch (e) {}
@@ -3331,6 +3398,12 @@ function entryHit(e, ctx, scene) {
 }
 const entryPrio = (e) => (e && isFinite(+e.prio) && e.prio !== '' && e.prio !== null) ? +e.prio : 100;
 const entryDepth = (e) => Math.max(1, Math.min(40, Math.round(+e.depth) || 4));
+// 词条写进提示词的样子：整块 XML 指令原样放（不加「名字：」前缀），普通词条用「- 名字：内容」
+function entryLine(e) {
+    const t = String(e.text || '').trim();
+    if (/^<[A-Za-z_\u4e00-\u9fa5][^>]*>/.test(t)) return t;
+    return '- ' + (e.cat && e.cat !== '设定' ? '[' + e.cat + '] ' : '') + e.key + '：' + e.text;
+}
 function composeWB(d, ctx, scene) {
     d = d || {};
     const L = [];
@@ -3363,7 +3436,7 @@ function composeWB(d, ctx, scene) {
     if (rt.length) L.push('【TA的日常】' + rt.join('，'));
     if (d.rules) L.push('【规则】' + d.rules);
     const es = (d.entries || []).filter(e => (e.pos || 'system') !== 'depth' && entryHit(e, ctx, scene)).sort((a, b) => entryPrio(b) - entryPrio(a));
-    if (es.length) L.push('【设定】\n' + es.map(e => '- ' + (e.cat && e.cat !== '设定' ? '[' + e.cat + '] ' : '') + e.key + '：' + e.text).join('\n'));
+    if (es.length) L.push('【设定】\n' + es.map(entryLine).join('\n\n'));
     if (d.forbid) L.push('【禁止】' + d.forbid);
     if (d.samples) L.push('【说话示范（学习这种语气，不要照抄原句）】\n' + d.samples);
     const sty = [];
@@ -3377,7 +3450,7 @@ function composeWB(d, ctx, scene) {
 // 把"通用设定 + 指定的几本世界书"拼成一段提示词
 // 按深度插入聊天记录的词条：返回 [{depth, text}]
 function worldDepthFor(ids, ctx, scene) {
-    const out = [], push = (d) => (d.entries || []).forEach(e => { if (e.pos === 'depth' && entryHit(e, ctx, scene)) out.push({ depth: entryDepth(e), prio: entryPrio(e), text: '- ' + (e.cat && e.cat !== '设定' ? '[' + e.cat + '] ' : '') + e.key + '：' + e.text }); });
+    const out = [], push = (d) => (d.entries || []).forEach(e => { if (e.pos === 'depth' && entryHit(e, ctx, scene)) out.push({ depth: entryDepth(e), prio: entryPrio(e), text: entryLine(e) }); });
     push(getGlobalWorld() || {});
     const all = getWorlds(); (ids || []).forEach(id => { const w = all.find(x => x.id === id); if (w) push(w.data || {}); });
     const by = {}; out.sort((a, b) => b.prio - a.prio).forEach(o => { (by[o.depth] = by[o.depth] || []).push(o.text); });
@@ -3608,6 +3681,7 @@ on('worldPickOk', 'click', () => {
 async function readFileText(file) {
     const name = (file.name || '').toLowerCase();
     if (name.endsWith('.docx')) return extractDocxText(file);
+    if (window.CardImport && CardImport.read) return CardImport.read(file); // 自动识别 GBK / UTF-16 / html / rtf 等编码和格式
     return file.text();
 }
 async function extractDocxText(file) {
@@ -3642,22 +3716,78 @@ async function extractDocxText(file) {
         .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
         .replace(/\t+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 }
-// 文本 → 词条：有 2 个以上标题（# 标题 / 【标题】 / 《标题》）就按标题拆开，否则整份作为一条
+// ---------- 文本 → 词条（识别「作者说明 + 以下复制 + <xml指令块>」这类常见世界书/预设格式） ----------
+// 找出顶层的 <标签 …>…</标签> 块（支持同名嵌套），返回 [{tag, attrs, raw, start, end}]
+function xmlTopBlocks(text) {
+    const out = [], re = /<([A-Za-z_一-龥][\w:.\-一-龥]*)((?:\s+[^<>]*?)?)\s*(\/?)>/g;
+    let m;
+    while ((m = re.exec(text))) {
+        if (m[3]) { re.lastIndex = m.index + m[0].length; continue; }          // 自闭合
+        const tag = m[1], start = m.index, esc = tag.replace(/[.\-:]/g, '\\$&');
+        const tagRe = new RegExp('<(/?)' + esc + '(?:\\s[^<>]*)?(/?)>', 'g'); tagRe.lastIndex = start; // 从开标签起数深度
+        let depth = 0, t, end = -1;
+        while ((t = tagRe.exec(text))) { if (t[2]) continue; depth += t[1] ? -1 : 1; if (depth === 0) { end = t.index + t[0].length; break; } }
+        if (end < 0) { re.lastIndex = start + m[0].length; continue; }          // 没闭合：忽略这个标签
+        out.push({ tag: tag, attrs: m[2] || '', raw: text.slice(start, end), start: start, end: end });
+        re.lastIndex = end;
+    }
+    return out;
+}
+function attrOf(attrs, name) { const m = new RegExp(name + '\\s*=\\s*["“]([^"”]*)["”]', 'i').exec(attrs || ''); return m ? m[1].trim() : ''; }
+// 从作者说明里读出：常驻/关键词、位置、优先级、场景
+function settingsFromNote(note) {
+    const o = {}, n = String(note || '');
+    if (/常驻|一直生效|始终生效/.test(n)) o.mode = 'const';
+    const d = /深度\s*(\d{1,2})/.exec(n);
+    if (d) { o.pos = 'depth'; o.depth = Math.max(1, Math.min(40, +d[1])); }
+    else if (/角色设定后|设定后|角色卡后|放在设定区|系统提示/.test(n)) o.pos = 'system';
+    const p = /优先级\s*[:：]?\s*(最高|很高|较高|高|中|低|\d{1,4})/.exec(n);
+    if (p) o.prio = /^\d/.test(p[1]) ? +p[1] : /最高|很高/.test(p[1]) ? 300 : /高/.test(p[1]) ? 200 : /中/.test(p[1]) ? 100 : 50;
+    if (/仅线上|只在线上|线上专用/.test(n)) o.scene = 'online'; else if (/仅线下|只在线下|线下专用/.test(n)) o.scene = 'offline';
+    return o;
+}
+function cleanTitle(l) {
+    return String(l || '').replace(/^[#\s>*\-—]+/, '').replace(/^[《【\[「]|[》】\]」]$/g, '').replace(/[*_`]/g, '').trim();
+}
 function textToEntries(text, fallbackName) {
-    const lines = String(text).replace(/\r/g, '').trim().split('\n');
-    const re = /^\s*(?:#{1,4}\s+(.+?)|【([^】]{1,20})】|《([^》]{1,20})》)\s*$/;
-    const heads = [];
-    lines.forEach((ln, i) => { const m = re.exec(ln); if (m) heads.push({ i: i, name: (m[1] || m[2] || m[3]).trim() }); });
+    const src = String(text).replace(/\r/g, '').replace(/ /g, ' ').trim();
+    const lines = src.split('\n');
+    // 1) 说明区 / 正文区：「以下复制」「正文开始」之类的分隔行；没有的话，第一个 XML 块之前的文字当说明
+    const MARK = /^[\s\-—–_*#>]*(?:以下|下面|↓|⬇)?\s*(?:开始)?\s*(?:复制|正文|指令内容|提示词内容|内容如下)\s*[:：↓⬇]*\s*[\-—–_*]*\s*$/;
+    let mi = lines.findIndex(l => MARK.test(l.trim()) && l.trim().length <= 14);
+    let pre = '', body = src;
+    if (mi >= 0) { pre = lines.slice(0, mi).join('\n').trim(); body = lines.slice(mi + 1).join('\n').trim(); }
+    let blocks = xmlTopBlocks(body);
+    if (mi < 0 && blocks.length) {
+        const before = body.slice(0, blocks[0].start).trim();
+        if (before) { pre = before; body = body.slice(blocks[0].start); blocks = xmlTopBlocks(body); }
+    }
+    const note = pre, cfg = settingsFromNote(pre);
+    const titleLine = pre.split('\n').map(cleanTitle).filter(Boolean)[0] || '';
+    const mk = (key, txt, extra) => Object.assign({ key: String(key || fallbackName).slice(0, 30), text: txt, keys: '', cat: '设定', note: note }, cfg, extra || {});
+    // 2) 正文是 XML 块：一个块 = 一条词条（不拆散里面的小标签，保证整条指令完整）
+    if (blocks.length) {
+        const rest = (body.slice(0, blocks[0].start) + ' ' + body.slice(blocks[blocks.length - 1].end)).trim();
+        if (blocks.length === 1) {
+            const b = blocks[0];
+            return [mk(titleLine || attrOf(b.attrs, 'id') || b.tag, (rest ? rest + '\n\n' : '') + b.raw)];
+        }
+        return blocks.map((b, i) => mk(attrOf(b.attrs, 'id') || attrOf(b.attrs, 'name') || b.tag + (blocks.filter(x => x.tag === b.tag).length > 1 ? (i + 1) : ''), b.raw));
+    }
+    // 3) 普通文字：按标题拆（# 标题 / 【标题】 / 《标题》 / [标题]），没有标题就整份一条
+    const re = /^\s*(?:#{1,4}\s+(.+?)|【([^】]{1,80})】|《([^》]{1,80})》|\[([^\]]{1,80})\])\s*$/;
+    const bl = body.split('\n'), heads = [];
+    bl.forEach((ln, i) => { const m = re.exec(ln); if (m) heads.push({ i: i, name: (m[1] || m[2] || m[3] || m[4]).trim() }); });
     const out = [];
     if (heads.length >= 2) {
-        const pre = lines.slice(0, heads[0].i).join('\n').trim();
-        if (pre) out.push({ key: fallbackName, text: pre, keys: '', cat: '设定' });
+        const p0 = bl.slice(0, heads[0].i).join('\n').trim();
+        if (p0) out.push(mk(titleLine || fallbackName, p0));
         heads.forEach((h, k) => {
-            const body = lines.slice(h.i + 1, k + 1 < heads.length ? heads[k + 1].i : lines.length).join('\n').trim();
-            if (body) out.push({ key: h.name.slice(0, 30), text: body, keys: '', cat: '设定' });
+            const t = bl.slice(h.i + 1, k + 1 < heads.length ? heads[k + 1].i : bl.length).join('\n').trim();
+            if (t) out.push(mk(h.name, t));
         });
     }
-    if (!out.length) out.push({ key: fallbackName, text: lines.join('\n').trim(), keys: '', cat: '设定' });
+    if (!out.length) out.push(mk(titleLine || fallbackName, body.trim()));
     return out;
 }
 // 兼容常见格式的世界书 JSON / 角色卡内嵌世界书
@@ -3695,13 +3825,16 @@ async function parseWorldFile(file) {
             if (ents) throw new Error('这个 JSON 里没有可用的词条');
         }
     }
-    return [{ name: base, data: { entries: textToEntries(t, base) } }];
+    const ents = textToEntries(t, base);
+    return [{ name: (ents.length === 1 && ents[0].note && ents[0].key) ? ents[0].key : base, data: { entries: ents } }];
 }
 on('wbImportBtn', 'click', () => $('wbImportFile').click());
 on('wbImportFile', 'change', async (e) => {
-    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    const fs = Array.prototype.slice.call(e.target.files || []); e.target.value = ''; if (!fs.length) return;
     try {
-        const books = await parseWorldFile(f);
+        let books = [];
+        for (const f of fs) { try { books = books.concat(await parseWorldFile(f)); } catch (err) { if (fs.length === 1) throw err; uiAlert('「' + f.name + '」导入失败：' + err.message); } }
+        if (!books.length) return;
         const ws = getWorlds(); let last = null;
         books.forEach(b => { last = { id: 'world_' + Date.now() + Math.random().toString(36).slice(2, 5), name: String(b.name || '导入的世界书').slice(0, 20), data: b.data }; ws.push(last); });
         if (!saveWorlds(ws)) return;
@@ -3712,9 +3845,10 @@ on('wbImportFile', 'change', async (e) => {
 });
 on('wbEntryImportBtn', 'click', () => $('wbEntryFile').click());
 on('wbEntryFile', 'change', async (e) => {
-    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    const fs = Array.prototype.slice.call(e.target.files || []); e.target.value = ''; if (!fs.length) return;
     try {
-        const books = await parseWorldFile(f);
+        let books = [];
+        for (const f of fs) books = books.concat(await parseWorldFile(f));
         let n = 0;
         books.forEach(b => (b.data.entries || []).forEach(en => { wbEntries.push(Object.assign({}, en, { keys: en.keys || '', cat: en.cat || '设定' })); n++; }));
         renderWBEntries();
@@ -4488,6 +4622,7 @@ function applyChatBg() {
     const layers = []; if (v && dim > 0) layers.push('linear-gradient(rgba(0,0,0,' + (dim / 100) + '),rgba(0,0,0,' + (dim / 100) + '))'); if (v) layers.push(bgLayer(v));
     box.style.background = layers.length ? layers.join(',') : '';
     app.classList.toggle('has-bg', !!v);
+    try { fixBubbleContrast(); } catch (e) {}
 }
 let _bgScope = 'one';
 function openChatBgModal(scope) {

@@ -359,7 +359,7 @@
                 </div>
 
                 <div id="cardPaneImport" class="hidden">
-                    <p class="hint-line">文件里有什么就分成什么项，不会硬塞进手动填写的框。支持 .txt / .md / .json / .docx / .html / .csv，以及内嵌角色数据的 .png 角色卡；GBK 编码的文本也能读。</p>
+                    <p class="hint-line">文件里有什么就分成什么项，不会硬塞进手动填写的框。支持 .txt / .md / .json / .docx / .html / .csv，以及内嵌角色数据的 .png 角色卡；GBK 编码的文本也能读。像 &lt;character&gt;&lt;basic_information&gt;&lt;name&gt;…&lt;/name&gt; 这种带标签的角色卡，会按标签分成「基本信息 / 外貌 / 性格 / 说话方式 · 线上聊天…」，线上聊天时只用线上部分，线下剧情只用线下部分。</p>
                     <input type="file" id="cardImportFile" accept="*/*" style="display:none;">
                     <button id="cardImportPickBtn" class="btn-secondary">选择文件</button>
                     <textarea id="cardImportText" class="input-textarea" style="min-height:120px;" placeholder="或者直接粘贴角色设定（什么格式都行）..."></textarea>
@@ -787,8 +787,8 @@
                     <div id="wbList"></div>
                     <button id="wbNewBtn" class="btn-primary">＋ 新建世界书</button>
                     <button id="wbImportBtn" class="btn-secondary">导入世界书文件</button>
-                    <input type="file" id="wbImportFile" accept=".txt,.md,.json,.docx,.csv" style="display:none;">
-                    <p class="hint-line">支持：本小手机导出的世界书、世界书 JSON 文件，以及 txt / md / Word 设定文档。文档里用「# 标题」或「【标题】」分段，会自动拆成多条词条。</p>
+                    <input type="file" id="wbImportFile" accept="*/*" multiple style="display:none;">
+                    <p class="hint-line">支持：Word / txt / md / json 文件，可以一次选多个。作者发的那种「说明 + 以下复制 + &lt;xml 指令块&gt;」会自动识别：说明里写的「常驻 / 角色设定后 / 优先级高」会直接套用，指令块整段保留为一条词条；用「# 标题」「【标题】」分段的文档会拆成多条。导入后可以在词条里再改。</p>
                 </div>
                 <div id="wbEditPane" class="hidden">
                     <div id="wbNameRow">
@@ -863,7 +863,7 @@
                         <button id="wbAddEntryBtn" class="btn-small">＋ 添加词条</button>
                         <button id="wbCancelEditBtn" class="btn-small" style="display:none;">取消修改</button>
                         <button id="wbEntryImportBtn" class="btn-small">从文件导入词条</button>
-                        <input type="file" id="wbEntryFile" accept=".txt,.md,.json,.docx,.csv" style="display:none;">
+                        <input type="file" id="wbEntryFile" accept="*/*" multiple style="display:none;">
                     </div>
                     <div class="entry-add" id="wbTestBox">
                         <p class="hint-line" style="margin:0 0 6px;">试一试：输入一句话，看看哪些词条会生效</p>
@@ -1142,7 +1142,7 @@
     <script>
     (window.storeReady||Promise.resolve()).then(function(){
         // 每次发布改一下 B，浏览器就一定会拿最新文件；所有脚本并行下载、按顺序执行，比原来一个接一个快
-        var B='20261018', files=['script.js','together.js','games.js','life.js','home.js','home-folder.js','tts.js','period.js','memory.js','card-import.js','forum.js','forum-x.js','forum-hot.js','map.js','couple.js','homeland-art.js','homeland-items.js','homeland-char.js','homeland.js','shop-extra.js','phone-swap.js','match.js','chat-extra.js','agenda.js','countdown.js','icost.js','fanfic.js','study-data.js','study.js','doodle.js','photo-stack.js','backup.js'], left=files.length, done=false;
+        var B='20261020', files=['script.js','together.js','games.js','life.js','home.js','home-folder.js','tts.js','period.js','memory.js','card-import.js','forum.js','forum-x.js','forum-hot.js','map.js','couple.js','homeland-art.js','homeland-items.js','homeland-char.js','homeland.js','shop-extra.js','phone-swap.js','match.js','chat-extra.js','agenda.js','countdown.js','icost.js','fanfic.js','study-data.js','study.js','doodle.js','photo-stack.js','album.js','backup.js'], left=files.length, done=false;
         function finish(){
             if(done)return; done=true;
             try{ if(window.renderHome) window.renderHome(); }catch(e){}   // 后面才加载的应用（地图/广场/回忆…）在这里补进桌面，不用再切一次应用
